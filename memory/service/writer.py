@@ -1,18 +1,17 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from memory.classification import RuleMemoryClassifier
 from memory.extraction import RuleMemoryExtractor
 from memory.governance import ConflictDetector, DedupDecision, Deduplicator, VersionedMemoryUpdater
-from memory.schema import MemoryAction, MemoryRecord, WriteResult
+from memory.schema import MemoryAction, MemoryRecord, WriteResult, coerce_datetime, utcnow
 from memory.scoring import ImportanceScorer
 from memory.storage import MemoryStore
 
 
 class MemoryWriterV1:
-    """Executable V1 write pipeline.
-
-    Extraction -> Classification -> Importance -> Dedup -> Conflict -> Add/Version Update.
-    """
+    """Executable V1 write pipeline with controllable validity timestamps."""
 
     def __init__(
         self,
@@ -32,8 +31,15 @@ class MemoryWriterV1:
         self.conflict_detector = conflict_detector or ConflictDetector()
         self.updater = updater or VersionedMemoryUpdater(store)
 
-    def write(self, messages, user_id: str = "default", session_id: str = "default") -> list[WriteResult]:
+    def write(
+        self,
+        messages,
+        user_id: str = "default",
+        session_id: str = "default",
+        at: datetime | str | None = None,
+    ) -> list[WriteResult]:
         outputs: list[WriteResult] = []
+        write_time = coerce_datetime(at) or utcnow()
         for candidate in self.extractor.extract(messages):
             memory_type, class_conf = self.classifier.classify(candidate)
             record = MemoryRecord(
@@ -44,6 +50,8 @@ class MemoryWriterV1:
                 entities=candidate.entities,
                 keywords=candidate.keywords,
                 event_time=candidate.event_time,
+                created_at=write_time,
+                valid_from=write_time,
                 importance=self.importance_scorer.score(candidate),
                 confidence=min(candidate.confidence, class_conf),
                 subject=candidate.subject,
@@ -55,7 +63,11 @@ class MemoryWriterV1:
             dedup = self.deduplicator.check(record, active)
             if dedup.decision in {DedupDecision.EXACT_DUPLICATE, DedupDecision.SEMANTIC_DUPLICATE}:
                 outputs.append(
-                    WriteResult(MemoryAction.IGNORE, dedup.matched_memory_id, f"deduplicated: {dedup.decision.value}")
+                    WriteResult(
+                        MemoryAction.IGNORE,
+                        dedup.matched_memory_id,
+                        f"deduplicated: {dedup.decision.value}",
+                    )
                 )
                 continue
             conflict = self.conflict_detector.detect(record, active)
@@ -63,7 +75,7 @@ class MemoryWriterV1:
                 old = self.store.get(conflict.old_memory_id)
                 if old is None:
                     raise RuntimeError("conflict target disappeared")
-                new = self.updater.supersede(old, record)
+                new = self.updater.supersede(old, record, at=write_time)
                 outputs.append(
                     WriteResult(
                         MemoryAction.SUPERSEDE,
