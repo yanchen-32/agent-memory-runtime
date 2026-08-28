@@ -5,6 +5,12 @@ from datetime import datetime, timezone
 import json
 import os
 from pathlib import Path
+import sys
+
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from agent import OpenAICompatibleClient, RuleBasedClient
 from benchmark import load_jsonl
@@ -20,16 +26,15 @@ E2_CATEGORIES = {"update", "conflict", "temporal"}
 
 
 def parse_args() -> argparse.Namespace:
-    root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser(
         description="Run formal E1 long-term and E2 update/conflict experiments."
     )
     parser.add_argument(
         "--benchmark",
         type=Path,
-        default=root / "benchmark" / "data" / "benchmark_v0.2.jsonl",
+        default=ROOT / "benchmark" / "data" / "benchmark_v0.2.jsonl",
     )
-    parser.add_argument("--output-dir", type=Path, default=root / "results")
+    parser.add_argument("--output-dir", type=Path, default=ROOT / "results")
     parser.add_argument("--agents", default="B0,B1,B2,Ours")
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--top-k", type=int, default=5)
