@@ -11,6 +11,16 @@ def utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def coerce_datetime(value: datetime | str | None) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        value = datetime.fromisoformat(value)
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value
+
+
 class MemoryType(str, Enum):
     WORKING = "working"
     EPISODIC = "episodic"
@@ -120,3 +130,4 @@ class ReadResult:
     query: str
     hits: list[SearchResult]
     context: str
+    query_time: datetime | None = None
