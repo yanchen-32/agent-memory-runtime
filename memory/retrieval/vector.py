@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 import numpy as np
 
 from memory.embedding import EmbeddingModel
@@ -8,14 +10,24 @@ from memory.storage import MemoryStore
 
 
 class VectorRetriever:
-    """V1 semantic retriever over the full MemoryRecord store."""
+    """V1 semantic retriever with optional point-in-time filtering."""
 
     def __init__(self, store: MemoryStore, embedder: EmbeddingModel):
         self.store = store
         self.embedder = embedder
 
-    def search(self, query: str, top_k: int = 5, user_id: str | None = None) -> list[SearchResult]:
-        records = self.store.list_active(user_id=user_id)
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        user_id: str | None = None,
+        query_time: datetime | str | None = None,
+    ) -> list[SearchResult]:
+        records = (
+            self.store.list_valid_at(query_time, user_id=user_id)
+            if query_time is not None
+            else self.store.list_active(user_id=user_id)
+        )
         if top_k <= 0 or not records:
             return []
         q = self.embedder.encode([query])[0]
@@ -33,7 +45,11 @@ class VectorRetriever:
                 memory_id=records[i].memory_id,
                 content=records[i].content,
                 score=float(scores[i]),
-                metadata={"retriever": "vector-v1", "memory_type": records[i].memory_type.value},
+                metadata={
+                    "retriever": "vector-v1",
+                    "memory_type": records[i].memory_type.value,
+                    "query_time": str(query_time) if query_time is not None else None,
+                },
             )
             for i in order
         ]
