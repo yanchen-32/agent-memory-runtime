@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import datetime, timezone
-from pathlib import Path
 from statistics import mean
 import time
 from typing import Callable, Iterable
@@ -22,13 +21,11 @@ from .metrics import answer_metrics, estimate_tokens, retrieval_metrics
 
 
 AGENT_NAMES = ("B0", "B1", "B2", "Ours")
-RETRIEVAL_KEYS = ("recall@1", "recall@5", "recall@10", "mrr")
-NUMERIC_KEYS = (
-    "correct",
-    "prompt_tokens",
-    "context_tokens",
-    "latency_ms",
-    *RETRIEVAL_KEYS,
+RETRIEVAL_KEYS = (
+    "recall@1", "precision@1",
+    "recall@5", "precision@5",
+    "recall@10", "precision@10",
+    "mrr",
 )
 
 
@@ -63,7 +60,7 @@ def _apply_forgetting_setup(runtime: MemoryRuntimeV1, case: BenchmarkCase) -> li
     }
     target_ids = set(case.forget_memory_ids)
     attributes = case.memory_metadata or {}
-    old_time = _parse_time(case.query_time)
+    query_time = _parse_time(case.query_time)
 
     for record in runtime.store.list_all():
         benchmark_id = content_to_id.get(record.content)
@@ -75,30 +72,13 @@ def _apply_forgetting_setup(runtime: MemoryRuntimeV1, case: BenchmarkCase) -> li
         created_at = _parse_time(config.get("created_at")) if config else None
         if created_at is not None:
             record.created_at = created_at
-        elif old_time is not None:
-            record.created_at = old_time
+        elif query_time is not None:
+            record.created_at = query_time
         runtime.store.update(record)
 
     return runtime.forgetting.run(
         user_id="benchmark",
-        now=_parse_time(case.query_time),
-    )
-
-
-def _build_client(
-    client_mode: str,
-    model: str | None,
-    base_url: str,
-    api_key: str,
-    timeout: int,
-):
-    if client_mode == "rule":
-        return RuleBasedClient()
-    return OpenAICompatibleClient(
-        model=model,
-        base_url=base_url,
-        api_key=api_key,
-        timeout=timeout,
+        now=query_time,
     )
 
 
@@ -106,8 +86,10 @@ def _map_runtime_ids(agent: MemoryRuntimeAgent, case: BenchmarkCase) -> list[str
     content_to_id = _case_content_map(case)
     mapped: list[str] = []
     for content in agent.last_retrieved_contents:
-        mapped.append(content_to_id.get(content, ""))
-    return [memory_id for memory_id in mapped if memory_id]
+        memory_id = content_to_id.get(content, "")
+        if memory_id:
+            mapped.append(memory_id)
+    return mapped
 
 
 def _empty_retrieval_metrics() -> dict[str, float | None]:
@@ -138,6 +120,7 @@ def run_case(
         latency_ms = (time.perf_counter() - started) * 1000
         ranked_ids: list[str] = []
         retrieval_supported = False
+        archived_ids: list[str] = []
 
     elif agent_name == "B1":
         agent = FullHistoryAgent(client)
@@ -151,6 +134,7 @@ def run_case(
         latency_ms = (time.perf_counter() - started) * 1000
         ranked_ids = []
         retrieval_supported = False
+        archived_ids = []
 
     elif agent_name == "B2":
         store = VectorMemoryStore(embedder_factory())
@@ -167,6 +151,7 @@ def run_case(
         latency_ms = (time.perf_counter() - started) * 1000
         ranked_ids = list(agent.last_retrieved_ids)
         retrieval_supported = True
+        archived_ids = []
 
     else:
         runtime = MemoryRuntimeV1(embedder=embedder_factory())
@@ -257,6 +242,8 @@ def run_benchmark(
     token_budget: int | None = None,
     repeats: int = 1,
 ) -> tuple[list[dict], list[dict]]:
+    if repeats < 1:
+        raise ValueError("repeats must be >= 1")
     cases = list(cases)
     agent_names = list(agent_names)
     rows: list[dict] = []
