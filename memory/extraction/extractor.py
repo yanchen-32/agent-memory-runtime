@@ -9,14 +9,14 @@ from memory.schema import MemoryCandidate
 
 
 class RuleMemoryExtractor:
-    """Deterministic V1 extractor used by tests and offline development.
-
-    It extracts user/tool statements and recognizes common fact forms. The
-    production path can swap this implementation for LLMMemoryExtractor.
-    """
+    """Deterministic V1 extractor used by tests and offline development."""
 
     _fact_patterns = [
-        re.compile(r"(?P<subject>[^。！？]{1,40}?)(?:的)?(?P<predicate>截止日期|答辩日期|截止时间|部署平台|数据库|架构|项目名称)(?:是|为|改为|改成|确定为|：|:)?(?P<object>[^。！？]+)"),
+        re.compile(
+            r"(?P<subject>[^。！？]{1,40}?)(?:的)?"
+            r"(?P<predicate>截止日期|答辩日期|答辩时间|截止时间|部署平台|数据库|架构|项目名称)"
+            r"(?:是|为|改为|改成|确定为|：|:)?(?P<object>[^。！？]+)"
+        ),
         re.compile(r"(?P<subject>我)(?P<predicate>喜欢|偏好|使用)(?P<object>[^。！？]+)"),
     ]
 
@@ -34,9 +34,12 @@ class RuleMemoryExtractor:
         for pattern in cls._fact_patterns:
             match = pattern.search(content)
             if match:
+                predicate = match.group("predicate").strip()
+                if predicate == "答辩时间":
+                    predicate = "答辩日期"
                 return (
                     match.group("subject").strip(" ，,：:"),
-                    match.group("predicate").strip(),
+                    predicate,
                     match.group("object").strip(" ，,：:"),
                 )
         return None, None, None
@@ -75,7 +78,7 @@ class LLMMemoryExtractor:
     """Structured-output V1 extractor.
 
     json_generator receives one prompt string and may return JSON text, a dict,
-    or a list. This keeps the runtime independent of any specific LLM SDK.
+    or a list.
     """
 
     def __init__(self, json_generator: Callable[[str], str | dict | list]):

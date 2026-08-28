@@ -4,6 +4,7 @@ from .vector_store import MemoryHit, VectorMemoryRecord, VectorMemoryStore
 
 # Memory Runtime V1 exports.
 from .classification import LLMMemoryClassifier, RuleMemoryClassifier
+from .context_budget import BudgetSelection, ContextBudgetManager
 from .extraction import LLMMemoryExtractor, RuleMemoryExtractor
 from .governance import (
     ConflictDetector,
@@ -27,6 +28,7 @@ from .schema import (
     ReadResult,
     SearchResult,
     WriteResult,
+    coerce_datetime,
 )
 from .scoring import ImportanceBreakdown, ImportanceScorer, RecencyScorer
 from .service import MemoryReaderV1, MemoryWriterV1
@@ -35,11 +37,14 @@ from .storage import InMemoryMemoryStore, MemoryStore, SQLiteMemoryStore
 __all__ = [
     "EmbeddingModel", "HashEmbeddingModel", "SentenceTransformerEmbedder",
     "MemoryHit", "VectorMemoryRecord", "VectorMemoryStore",
-    "LLMMemoryClassifier", "RuleMemoryClassifier", "LLMMemoryExtractor", "RuleMemoryExtractor",
+    "LLMMemoryClassifier", "RuleMemoryClassifier",
+    "BudgetSelection", "ContextBudgetManager",
+    "LLMMemoryExtractor", "RuleMemoryExtractor",
     "ConflictDetector", "ConflictResult", "DedupDecision", "DedupResult", "Deduplicator", "VersionedMemoryUpdater",
     "CompressionResult", "ForgettingPolicy", "MemoryCompressor", "StrengthBreakdown",
     "WeightedReranker", "BM25Retriever", "HybridRetriever", "VectorRetriever", "MemoryRuntimeV1",
     "ConflictType", "MemoryAction", "MemoryCandidate", "MemoryRecord", "MemoryStatus", "MemoryType",
-    "ReadResult", "SearchResult", "WriteResult", "ImportanceBreakdown", "ImportanceScorer", "RecencyScorer",
+    "ReadResult", "SearchResult", "WriteResult", "coerce_datetime",
+    "ImportanceBreakdown", "ImportanceScorer", "RecencyScorer",
     "MemoryReaderV1", "MemoryWriterV1", "InMemoryMemoryStore", "MemoryStore", "SQLiteMemoryStore",
 ]

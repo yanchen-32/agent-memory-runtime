@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 import re
 from collections import Counter
+from datetime import datetime
 
 from memory.schema import SearchResult
 from memory.storage import MemoryStore
@@ -21,8 +22,18 @@ class BM25Retriever:
         self.k1 = k1
         self.b = b
 
-    def search(self, query: str, top_k: int = 5, user_id: str | None = None) -> list[SearchResult]:
-        records = self.store.list_active(user_id=user_id)
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        user_id: str | None = None,
+        query_time: datetime | str | None = None,
+    ) -> list[SearchResult]:
+        records = (
+            self.store.list_valid_at(query_time, user_id=user_id)
+            if query_time is not None
+            else self.store.list_active(user_id=user_id)
+        )
         if top_k <= 0 or not records:
             return []
         docs = [tokenize(r.content) for r in records]
@@ -47,7 +58,11 @@ class BM25Retriever:
                 memory_id=records[i].memory_id,
                 content=records[i].content,
                 score=float(scores[i]),
-                metadata={"retriever": "bm25-v1", "memory_type": records[i].memory_type.value},
+                metadata={
+                    "retriever": "bm25-v1",
+                    "memory_type": records[i].memory_type.value,
+                    "query_time": str(query_time) if query_time is not None else None,
+                },
             )
             for i in order
         ]

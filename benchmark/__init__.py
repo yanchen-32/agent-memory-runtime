@@ -1,4 +1,11 @@
 from .loader import BenchmarkCase, load_jsonl
-from .metrics import retrieval_metrics
+from .metrics import answer_metrics, estimate_tokens, normalize_answer, retrieval_metrics
 
-__all__ = ["BenchmarkCase", "load_jsonl", "retrieval_metrics"]
+__all__ = [
+    "BenchmarkCase",
+    "load_jsonl",
+    "answer_metrics",
+    "estimate_tokens",
+    "normalize_answer",
+    "retrieval_metrics",
+]

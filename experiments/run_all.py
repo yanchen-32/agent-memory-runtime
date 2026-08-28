@@ -1,0 +1,139 @@
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from agent import OpenAICompatibleClient, RuleBasedClient
+from benchmark import load_jsonl
+from benchmark.runner import AGENT_NAMES, run_benchmark
+from memory import HashEmbeddingModel, SentenceTransformerEmbedder
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run B0/B1/B2/Ours with one comparable benchmark runner."
+    )
+    parser.add_argument(
+        "--benchmark",
+        type=Path,
+        default=ROOT / "benchmark" / "data" / "benchmark_v0.2.jsonl",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=ROOT / "results",
+    )
+    parser.add_argument(
+        "--agents",
+        default="B0,B1,B2,Ours",
+        help="Comma-separated subset of B0,B1,B2,Ours.",
+    )
+    parser.add_argument("--repeats", type=int, default=1)
+    parser.add_argument("--top-k", type=int, default=5)
+    parser.add_argument(
+        "--token-budget",
+        type=int,
+        default=None,
+        help="Global prompt budget; case-level budget takes precedence.",
+    )
+    parser.add_argument(
+        "--client",
+        choices=("rule", "openai"),
+        default="rule",
+        help="rule is offline deterministic; openai uses an OpenAI-compatible endpoint.",
+    )
+    parser.add_argument("--model", default=os.getenv("LLM_MODEL"))
+    parser.add_argument(
+        "--base-url",
+        default=os.getenv("LLM_BASE_URL", "http://localhost:8000/v1"),
+    )
+    parser.add_argument("--api-key", default=os.getenv("LLM_API_KEY", "EMPTY"))
+    parser.add_argument("--timeout", type=int, default=60)
+    parser.add_argument(
+        "--embedding",
+        choices=("hash", "sentence-transformers"),
+        default="hash",
+    )
+    parser.add_argument(
+        "--embedding-model",
+        default="BAAI/bge-small-zh-v1.5",
+    )
+    return parser.parse_args()
+
+
+def main() -> None:
+    args = parse_args()
+    if args.repeats < 1:
+        raise ValueError("--repeats must be >= 1")
+
+    agent_names = [name.strip() for name in args.agents.split(",") if name.strip()]
+    unknown = sorted(set(agent_names) - set(AGENT_NAMES))
+    if unknown:
+        raise ValueError(f"unknown agents: {unknown}")
+
+    cases = load_jsonl(args.benchmark)
+
+    def client_factory():
+        if args.client == "rule":
+            return RuleBasedClient()
+        return OpenAICompatibleClient(
+            model=args.model,
+            base_url=args.base_url,
+            api_key=args.api_key,
+            timeout=args.timeout,
+        )
+
+    def embedder_factory():
+        if args.embedding == "hash":
+            return HashEmbeddingModel(dim=384)
+        return SentenceTransformerEmbedder(args.embedding_model)
+
+    rows, summary = run_benchmark(
+        cases=cases,
+        agent_names=agent_names,
+        client_factory=client_factory,
+        embedder_factory=embedder_factory,
+        top_k=args.top_k,
+        token_budget=args.token_budget,
+        repeats=args.repeats,
+    )
+
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    detail_path = args.output_dir / "unified_results_v0.2.json"
+    summary_path = args.output_dir / "unified_summary_v0.2.json"
+    detail_path.write_text(
+        json.dumps(rows, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    summary_path.write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+    print(f"cases: {len(cases)}, agents: {', '.join(agent_names)}, repeats: {args.repeats}")
+    print("agent | accuracy | avg_prompt_tokens | avg_context_tokens | p50_ms | p95_ms | avg_recall@5 | avg_mrr")
+    for item in summary:
+        print(
+            f"{item['agent']} | "
+            f"{item['accuracy']:.3f} | "
+            f"{item['avg_prompt_tokens']:.1f} | "
+            f"{item['avg_context_tokens']:.1f} | "
+            f"{item['latency_p50_ms']:.4f} | "
+            f"{item['latency_p95_ms']:.4f} | "
+            f"{item['avg_recall@5'] if item['avg_recall@5'] is not None else 'NA'} | "
+            f"{item['avg_mrr'] if item['avg_mrr'] is not None else 'NA'}"
+        )
+    print(f"detail results: {detail_path}")
+    print(f"summary results: {summary_path}")
+
+
+if __name__ == "__main__":
+    main()
