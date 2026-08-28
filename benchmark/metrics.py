@@ -31,10 +31,15 @@ def retrieval_metrics(
 ) -> dict[str, float | None]:
     """Return retrieval metrics; None means retrieval is not applicable."""
     if not expected_ids:
-        return {f"recall@{k}": None for k in ks} | {"mrr": None}
+        result: dict[str, float | None] = {}
+        for k in ks:
+            result[f"recall@{k}"] = None
+            result[f"precision@{k}"] = None
+        result["mrr"] = None
+        return result
 
     expected = set(expected_ids)
-    result: dict[str, float | None] = {}
+    result = {}
     for k in ks:
         top = ranked_ids[:k]
         result[f"recall@{k}"] = (
