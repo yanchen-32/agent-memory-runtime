@@ -87,12 +87,7 @@ def _empty_retrieval_metrics() -> dict[str, float | None]:
     return {key: None for key in RETRIEVAL_KEYS}
 
 
-def _invoke(
-    agent_name: str,
-    agent,
-    case: BenchmarkCase,
-    token_budget: int | None,
-):
+def _invoke(agent_name: str, agent, case: BenchmarkCase, token_budget: int | None):
     if agent_name == "B0":
         return agent.answer(case.query)
     if agent_name == "B1":
@@ -119,7 +114,6 @@ def _snapshot(agent_name: str, agent, case: BenchmarkCase) -> dict:
         "prompt": getattr(agent, "last_prompt", ""),
         "context": getattr(agent, "last_context", ""),
         "ranked_ids": ranked_ids,
-        "prediction": getattr(agent, "_last_prediction", ""),
     }
 
 
@@ -202,6 +196,15 @@ def run_case(
     answer_correct = int(
         answer_metrics(prediction_after, case.expected_answer)["exact_match"]
     )
+    historical_retrieval_correct = (
+        int(bool(set(case.expected_memory_ids) & set(after["ranked_ids"])))
+        if case.category == "temporal"
+        else None
+    )
+    budget_after_tokens = estimate_tokens(after["prompt"])
+    budget_before_tokens = (
+        estimate_tokens(before["prompt"]) if before is not None else None
+    )
     row = {
         "agent": agent_name,
         "case_id": case.case_id,
@@ -217,25 +220,27 @@ def run_case(
         "historical_query_correct": (
             answer_correct if case.category == "temporal" else None
         ),
-        "prompt_tokens": estimate_tokens(after["prompt"]),
-        "token_count": estimate_tokens(after["prompt"]),
+        "historical_retrieval_correct": historical_retrieval_correct,
+        "prompt_tokens": budget_after_tokens,
+        "token_count": budget_after_tokens,
         "context_tokens": estimate_tokens(after["context"]),
         "setup_latency_ms": round(setup_ms, 4),
         "latency_ms": round(latency_after, 4),
         "retrieval_supported": retrieval_supported,
         "retrieved_memory_ids": after["ranked_ids"],
         "expected_memory_ids": case.expected_memory_ids,
-        "budget_before_prompt_tokens": (
-            estimate_tokens(before["prompt"]) if before is not None else None
-        ),
+        "budget_before_prompt_tokens": budget_before_tokens,
         "budget_after_prompt_tokens": (
-            estimate_tokens(after["prompt"]) if is_budget_case else None
+            budget_after_tokens if is_budget_case else None
         ),
         "budget_before_context_tokens": (
             estimate_tokens(before["context"]) if before is not None else None
         ),
         "budget_after_context_tokens": (
             estimate_tokens(after["context"]) if is_budget_case else None
+        ),
+        "budget_satisfied": (
+            budget_after_tokens <= budget if is_budget_case else None
         ),
         "accuracy_before_budget": (
             int(answer_metrics(prediction_before, case.expected_answer)["exact_match"])
@@ -250,8 +255,8 @@ def run_case(
             else None
         ),
         "budget_token_delta": (
-            estimate_tokens(after["prompt"]) - estimate_tokens(before["prompt"])
-            if before is not None
+            budget_after_tokens - budget_before_tokens
+            if budget_before_tokens is not None
             else None
         ),
         "latency_before_budget_ms": (
@@ -316,19 +321,35 @@ def summarize(rows: Iterable[dict]) -> list[dict]:
         for key in RETRIEVAL_KEYS:
             _numeric_summary(item, agent_rows, key)
 
-        historical = [
+        historical_answer = [
             float(row["historical_query_correct"])
             for row in agent_rows
             if row.get("historical_query_correct") is not None
         ]
-        item["historical_query_accuracy"] = mean(historical) if historical else None
-        item["historical_query_accuracy_std"] = _std(historical) if historical else None
+        item["historical_query_accuracy"] = (
+            mean(historical_answer) if historical_answer else None
+        )
+        item["historical_query_accuracy_std"] = (
+            _std(historical_answer) if historical_answer else None
+        )
+        historical_retrieval = [
+            float(row["historical_retrieval_correct"])
+            for row in agent_rows
+            if row.get("historical_retrieval_correct") is not None
+        ]
+        item["historical_retrieval_accuracy"] = (
+            mean(historical_retrieval) if historical_retrieval else None
+        )
+        item["historical_retrieval_accuracy_std"] = (
+            _std(historical_retrieval) if historical_retrieval else None
+        )
 
         for key in (
             "budget_before_prompt_tokens",
             "budget_after_prompt_tokens",
             "budget_before_context_tokens",
             "budget_after_context_tokens",
+            "budget_satisfied",
             "accuracy_before_budget",
             "accuracy_after_budget",
             "budget_accuracy_delta",
