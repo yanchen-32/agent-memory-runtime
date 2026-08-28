@@ -115,3 +115,17 @@ memory/vector_store.py remains deliberately minimal so B2 and later ablations re
 - prompt_tokens is a deterministic estimate unless a model tokenizer is configured.
 - latency_ms measures query-time answer latency; setup latency is reported separately.
 - Generated result files are not committed as experimental evidence.
+
+## Temporal query and context budget
+
+MemoryRuntimeV1.read accepts query_time. Omitting query_time reads the current active state; supplying query_time reads versions valid at that point using the interval [valid_from, valid_to).
+
+The runtime also exposes ContextBudgetManager through select_context. Selection combines retrieval relevance, memory importance, diversity, redundancy and token efficiency. The budget applies to the complete prompt represented by prefix, selected context and suffix.
+
+Run the formal experiments with three repeats:
+
+~~~bash
+python experiments/run_e1_e2.py
+~~~
+
+The E1 output covers long-term recall, budget, multi-hop and forgetting. The E2 output covers update, conflict and temporal query accuracy. Each summary contains accuracy mean/std and latency mean/std/P50/P95.
