@@ -5,25 +5,53 @@ Competition-oriented Agent Memory Runtime repository for long-horizon Agent memo
 ## Current milestones
 
 - Milestone 01: B0 No-Memory Agent, B2 Vector Memory Baseline, Benchmark v0.1.
-- Milestone 02: Memory Runtime V1 — all 13 first-stage memory modules implemented and integrated.
+- Milestone 02: Memory Runtime V1 — first-stage memory modules implemented and integrated.
+- Milestone 03: B1 Full-History Baseline and unified Benchmark v0.2 runner.
 
 ## Quick start
 
-```bash
+~~~bash
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
 pytest -q
+
 python experiments/run_b0_no_memory.py
 python experiments/run_b2_vector_memory.py
-```
+python experiments/run_all.py
+~~~
 
-The default implementation is offline and deterministic. For a production-like vector baseline/runtime, install `sentence-transformers` separately and use `SentenceTransformerEmbedder` with an ARM64-compatible embedding model.
+The unified runner evaluates B0, B1, B2 and Ours with the same answer, retrieval, token and latency fields:
+
+~~~text
+results/unified_results_v0.2.json
+results/unified_summary_v0.2.json
+~~~
+
+Use repeated offline runs for variance estimation:
+
+~~~bash
+python experiments/run_all.py --repeats 3
+~~~
+
+Use an OpenAI-compatible LLM endpoint:
+
+~~~bash
+python experiments/run_all.py \\
+  --client openai \\
+  --model your-model-name \\
+  --base-url http://localhost:8000/v1 \\
+  --embedding sentence-transformers \\
+  --embedding-model BAAI/bge-small-zh-v1.5 \\
+  --repeats 3
+~~~
+
+The default implementation is offline and deterministic. Sentence Transformers is optional and should use an ARM64-compatible embedding model for Kunpeng experiments.
 
 ## Repository layout
 
-```text
-agent/                 Agent interfaces and frozen B0/B2 agents
+~~~text
+agent/                 Agent interfaces and B0/B1/B2/Ours adapters
 memory/
   schema/              MemoryRecord and runtime enums/results
   extraction/          Memory Extraction V1
@@ -36,17 +64,17 @@ memory/
   service/             Integrated Write/Read pipelines
   runtime.py           MemoryRuntimeV1 facade
   vector_store.py      Frozen B2 vector baseline store
-benchmark/             Benchmark loader, metrics and v0.1 cases
-experiments/           Baseline experiment scripts
+benchmark/             Benchmark loader, metrics, v0.1 and v0.2 cases
+experiments/           Baseline and unified experiment scripts
 tests/                 Regression tests
 docs/                  Milestone and architecture notes
-```
+~~~
 
 ## V1 data flow
 
 Write pipeline:
 
-```text
+~~~text
 Conversation / Tool Result
   -> Memory Extraction
   -> Memory Classification
@@ -55,11 +83,11 @@ Conversation / Tool Result
   -> Conflict Detection
   -> ADD / SUPERSEDE
   -> Memory Storage
-```
+~~~
 
 Read pipeline:
 
-```text
+~~~text
 Query
   -> Vector Retrieval + BM25
   -> RRF Hybrid Retrieval
@@ -67,43 +95,23 @@ Query
   -> Importance / Utility / Recency / Entity Rerank
   -> Compression
   -> Memory Context
-```
+~~~
 
-Lifecycle V1 computes memory strength from importance, utility, recency and access frequency, then archives low-value memories instead of destructively deleting them.
+B1 deliberately bypasses this memory pipeline and sends the full conversation history to the model. B2 remains a minimal vector baseline. Ours uses MemoryRuntimeV1.
 
 ## Baseline integrity
 
-- **B0 No Memory**: the agent receives only the current query.
-- **B2 Vector Memory**: embedding + cosine vector search + Top-K prompt injection.
+- B0 No Memory: the agent receives only the current query.
+- B1 Full History: the agent receives the complete conversation history.
+- B2 Vector Memory: embedding + cosine vector search + Top-K prompt injection.
+- Ours: Memory Runtime V1 write/read pipeline with governance and lifecycle hooks.
 
-`memory/vector_store.py` remains deliberately minimal. It does not contain BM25, versioning, conflict governance, lifecycle or reranking. New capabilities live in separate Memory Runtime modules so B2/B3/Proposed and later ablations remain comparable.
+memory/vector_store.py remains deliberately minimal so B2 and later ablations remain comparable.
 
-## Using Memory Runtime V1
+## Metric notes
 
-```python
-from memory import HashEmbeddingModel, MemoryRuntimeV1
-
-runtime = MemoryRuntimeV1(embedder=HashEmbeddingModel(dim=384))
-
-runtime.write(
-    [{"role": "user", "content": "Agent Memory项目的数据库是openGauss。"}],
-    user_id="demo-user",
-)
-
-result = runtime.read("项目数据库是什么？", top_k=3, user_id="demo-user")
-print(result.context)
-```
-
-All production-sensitive components are dependency-injectable. `LLMMemoryExtractor` and `LLMMemoryClassifier` accept generic JSON generator callables, and `SentenceTransformerEmbedder` can replace the hash embedder without changing the runtime interfaces.
-
-## Connecting a real LLM
-
-The repository includes a minimal OpenAI-compatible client for Agent baselines. It works with endpoints exposing `/v1/chat/completions`.
-
-```bash
-export LLM_BASE_URL=http://localhost:8000/v1
-export LLM_API_KEY=EMPTY
-export LLM_MODEL=your-model-name
-```
-
-For reportable experiments, keep the same LLM, embedding model, generation parameters and benchmark split across compared methods.
+- B0 and B1 have no retrieval operation; Recall and MRR are recorded as null.
+- B2 and Ours report Recall@1/5/10 and MRR against benchmark memory IDs.
+- prompt_tokens is a deterministic estimate unless a model tokenizer is configured.
+- latency_ms measures query-time answer latency; setup latency is reported separately.
+- Generated result files are not committed as experimental evidence.
