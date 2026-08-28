@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import datetime
 
 from memory.schema import SearchResult
 
 
 class HybridRetriever:
-    """V1 Vector + BM25 retrieval with Reciprocal Rank Fusion."""
+    """V1 Vector + BM25 retrieval with RRF and optional time filtering."""
 
     def __init__(self, vector_retriever, bm25_retriever, rrf_k: int = 60, candidate_multiplier: int = 4):
         self.vector_retriever = vector_retriever
@@ -14,10 +15,20 @@ class HybridRetriever:
         self.rrf_k = rrf_k
         self.candidate_multiplier = candidate_multiplier
 
-    def search(self, query: str, top_k: int = 5, user_id: str | None = None) -> list[SearchResult]:
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        user_id: str | None = None,
+        query_time: datetime | str | None = None,
+    ) -> list[SearchResult]:
         candidate_k = max(top_k, top_k * self.candidate_multiplier)
-        vector_hits = self.vector_retriever.search(query, candidate_k, user_id=user_id)
-        bm25_hits = self.bm25_retriever.search(query, candidate_k, user_id=user_id)
+        vector_hits = self.vector_retriever.search(
+            query, candidate_k, user_id=user_id, query_time=query_time
+        )
+        bm25_hits = self.bm25_retriever.search(
+            query, candidate_k, user_id=user_id, query_time=query_time
+        )
         scores: dict[str, float] = defaultdict(float)
         content: dict[str, str] = {}
         detail: dict[str, dict] = defaultdict(dict)
