@@ -4,6 +4,7 @@ from .vector_store import MemoryHit, VectorMemoryRecord, VectorMemoryStore
 
 # Memory Runtime V1 exports.
 from .classification import LLMMemoryClassifier, RuleMemoryClassifier
+from .consolidation import ConsolidationGroup, ConsolidationReport, MemoryConsolidator
 from .context_budget import BudgetSelection, ContextBudgetManager
 from .extraction import LLMMemoryExtractor, RuleMemoryExtractor
 from .governance import (
@@ -40,6 +41,7 @@ __all__ = [
     "LLMMemoryClassifier", "RuleMemoryClassifier",
     "BudgetSelection", "ContextBudgetManager",
     "LLMMemoryExtractor", "RuleMemoryExtractor",
+    "ConsolidationGroup", "ConsolidationReport", "MemoryConsolidator",
     "ConflictDetector", "ConflictResult", "DedupDecision", "DedupResult", "Deduplicator", "VersionedMemoryUpdater",
     "CompressionResult", "ForgettingPolicy", "MemoryCompressor", "StrengthBreakdown",
     "WeightedReranker", "BM25Retriever", "HybridRetriever", "VectorRetriever", "MemoryRuntimeV1",
