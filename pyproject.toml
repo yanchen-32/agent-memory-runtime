@@ -1,0 +1,10 @@
+[project]
+name = "agent-memory-runtime"
+version = "0.1.0"
+description = "Competition-oriented Agent Memory Runtime baselines"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
