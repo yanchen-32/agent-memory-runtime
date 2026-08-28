@@ -8,10 +8,12 @@ from .models import (
     ReadResult,
     SearchResult,
     WriteResult,
+    coerce_datetime,
     utcnow,
 )
 
 __all__ = [
     "ConflictType", "MemoryAction", "MemoryCandidate", "MemoryRecord",
-    "MemoryStatus", "MemoryType", "ReadResult", "SearchResult", "WriteResult", "utcnow",
+    "MemoryStatus", "MemoryType", "ReadResult", "SearchResult", "WriteResult",
+    "coerce_datetime", "utcnow",
 ]
