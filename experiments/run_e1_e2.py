@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
         default=ROOT / "benchmark" / "data" / "benchmark_v0.2.jsonl",
     )
     parser.add_argument("--output-dir", type=Path, default=ROOT / "results")
-    parser.add_argument("--agents", default="B0,B1,B2,Ours")
+    parser.add_argument("--agents", default="B0,B1,B2,B3,Ours")
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--top-k", type=int, default=5)
     parser.add_argument("--token-budget", type=int, default=None)
