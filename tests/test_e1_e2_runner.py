@@ -20,7 +20,9 @@ def test_runner_emits_historical_and_budget_fields():
     )
 
     assert temporal_row["historical_query_correct"] in (0, 1)
+    assert temporal_row["historical_retrieval_correct"] == 1
     assert temporal_row["query_time"] is not None
     assert budget_row["budget_before_prompt_tokens"] is not None
     assert budget_row["budget_after_prompt_tokens"] is not None
+    assert budget_row["budget_satisfied"] is True
     assert budget_row["budget_accuracy_delta"] in (-1, 0, 1)
