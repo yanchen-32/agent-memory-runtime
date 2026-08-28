@@ -24,3 +24,18 @@ def test_unified_runner_emits_comparable_fields():
     assert required.issubset(rows[0])
     assert rows[0]["recall@5"] is None
     assert rows[2]["latency_ms"] >= 0
+
+
+def test_unified_runner_accepts_b3():
+    root = Path(__file__).resolve().parents[1]
+    cases = load_jsonl(root / "benchmark" / "data" / "benchmark_v0.2.jsonl")
+    rows, summary = run_benchmark(
+        cases=cases[:1],
+        agent_names=("B3",),
+        client_factory=RuleBasedClient,
+        embedder_factory=lambda: HashEmbeddingModel(dim=64),
+    )
+    assert len(rows) == 1
+    assert rows[0]["agent"] == "B3"
+    assert summary[0]["agent"] == "B3"
+    assert rows[0]["retrieval_supported"] is True
