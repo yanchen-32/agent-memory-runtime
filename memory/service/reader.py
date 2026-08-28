@@ -3,12 +3,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from memory.lifecycle import MemoryCompressor
-from memory.schema import ReadResult
+from memory.schema import ReadResult, coerce_datetime
 from memory.storage import MemoryStore
 
 
 class MemoryReaderV1:
-    """Executable V1 read pipeline: Hybrid Retrieval -> Rerank -> Compress -> Context."""
+    """Executable V1 read pipeline with current and historical query modes."""
 
     def __init__(self, store: MemoryStore, retriever, reranker, compressor: MemoryCompressor | None = None):
         self.store = store
@@ -16,9 +16,26 @@ class MemoryReaderV1:
         self.reranker = reranker
         self.compressor = compressor or MemoryCompressor()
 
-    def read(self, query: str, top_k: int = 5, user_id: str | None = None) -> ReadResult:
-        candidates = self.retriever.search(query, top_k=max(20, top_k * 4), user_id=user_id)
-        hits = self.reranker.rerank(query, candidates, top_k=top_k)
+    def read(
+        self,
+        query: str,
+        top_k: int = 5,
+        user_id: str | None = None,
+        query_time: datetime | str | None = None,
+    ) -> ReadResult:
+        point = coerce_datetime(query_time)
+        candidates = self.retriever.search(
+            query,
+            top_k=max(20, top_k * 4),
+            user_id=user_id,
+            query_time=point,
+        )
+        hits = self.reranker.rerank(
+            query,
+            candidates,
+            top_k=top_k,
+            now=point or datetime.now(timezone.utc),
+        )
         context_parts: list[str] = []
         now = datetime.now(timezone.utc)
         for hit in hits:
@@ -32,4 +49,9 @@ class MemoryReaderV1:
             hit.metadata["compressed"] = compressed.compressed
             hit.metadata["compression_ratio"] = compressed.ratio
             context_parts.append(f"[{record.memory_id}] {compressed.text}")
-        return ReadResult(query=query, hits=hits, context="\n".join(context_parts))
+        return ReadResult(
+            query=query,
+            hits=hits,
+            context="\n".join(context_parts),
+            query_time=point,
+        )
