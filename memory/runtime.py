@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from memory.context_budget import BudgetSelection, ContextBudgetManager
+from memory.consolidation import ConsolidationReport, MemoryConsolidator
 from memory.embedding import EmbeddingModel, HashEmbeddingModel
 from memory.governance import Deduplicator
 from memory.lifecycle import ForgettingPolicy, MemoryCompressor
@@ -36,6 +37,7 @@ class MemoryRuntimeV1:
         self.reader = MemoryReaderV1(self.store, self.hybrid_retriever, self.reranker, self.compressor)
         self.forgetting = ForgettingPolicy(self.store)
         self.budget_manager = budget_manager or ContextBudgetManager(self.store)
+        self.consolidator = MemoryConsolidator(self.store)
 
     def write(
         self,
@@ -80,3 +82,10 @@ class MemoryRuntimeV1:
             prefix=prefix,
             suffix=suffix,
         )
+
+    def consolidate(
+        self,
+        user_id: str | None = None,
+    ) -> ConsolidationReport:
+        """Consolidate active episodic memories and keep source traceability."""
+        return self.consolidator.consolidate(user_id=user_id)

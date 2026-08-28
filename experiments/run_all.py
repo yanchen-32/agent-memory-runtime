@@ -33,8 +33,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--agents",
-        default="B0,B1,B2,Ours",
-        help="Comma-separated subset of B0,B1,B2,Ours.",
+        default="B0,B1,B2,B3,Ours",
+        help="Comma-separated subset of B0,B1,B2,B3,Ours.",
     )
     parser.add_argument("--repeats", type=int, default=1)
     parser.add_argument("--top-k", type=int, default=5)
