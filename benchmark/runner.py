@@ -6,14 +6,20 @@ from statistics import mean, stdev
 import time
 from typing import Callable, Iterable
 
-from agent import FullHistoryAgent, MemoryRuntimeAgent, NoMemoryAgent, VectorMemoryAgent
+from agent import (
+    FullHistoryAgent,
+    HybridMemoryAgent,
+    MemoryRuntimeAgent,
+    NoMemoryAgent,
+    VectorMemoryAgent,
+)
 from memory import HashEmbeddingModel, MemoryRuntimeV1, VectorMemoryStore
 
 from .loader import BenchmarkCase
 from .metrics import answer_metrics, estimate_tokens, retrieval_metrics
 
 
-AGENT_NAMES = ("B0", "B1", "B2", "Ours")
+AGENT_NAMES = ("B0", "B1", "B2", "B3", "Ours")
 RETRIEVAL_KEYS = (
     "recall@1", "precision@1",
     "recall@5", "precision@5",
@@ -98,6 +104,8 @@ def _invoke(agent_name: str, agent, case: BenchmarkCase, token_budget: int | Non
         )
     if agent_name == "B2":
         return agent.answer(case.query, token_budget=token_budget)
+    if agent_name == "B3":
+        return agent.answer(case.query, token_budget=token_budget)
     return agent.answer(
         case.query,
         token_budget=token_budget,
@@ -164,6 +172,14 @@ def run_case(
             )
         agent = VectorMemoryAgent(client, store, top_k=top_k)
         retrieval_supported = True
+    elif agent_name == "B3":
+        agent = HybridMemoryAgent(
+            client,
+            embedder=embedder_factory(),
+            top_k=top_k,
+        )
+        agent.ingest(case.conversation)
+        retrieval_supported = True
     else:
         runtime = MemoryRuntimeV1(embedder=embedder_factory())
         agent = MemoryRuntimeAgent(client, runtime, top_k=top_k)
@@ -172,6 +188,9 @@ def run_case(
             user_id="benchmark",
             session_id=f"{case.case_id}-repeat-{repeat}",
         )
+        consolidation_report = None
+        if case.category == "consolidation":
+            consolidation_report = runtime.consolidate(user_id="benchmark")
         archived_ids = _apply_forgetting_setup(runtime, case)
         retrieval_supported = True
 
@@ -272,6 +291,16 @@ def run_case(
         row.update(_empty_retrieval_metrics())
     if agent_name == "Ours":
         row["archived_memory_ids"] = archived_ids
+        if consolidation_report is not None:
+            row["consolidation_created_ids"] = consolidation_report.created_ids
+            row["consolidation_updated_ids"] = consolidation_report.updated_ids
+            row["consolidation_source_count"] = consolidation_report.source_count
+            row["consolidation_fidelity"] = consolidation_report.fidelity
+        else:
+            row["consolidation_created_ids"] = []
+            row["consolidation_updated_ids"] = []
+            row["consolidation_source_count"] = None
+            row["consolidation_fidelity"] = None
     return row
 
 
