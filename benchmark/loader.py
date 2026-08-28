@@ -18,6 +18,7 @@ class BenchmarkCase:
     query_time: str
     difficulty: str
     token_budget: int | None = None
+    memory_query_time: str | None = None
     forget_memory_ids: list[str] = field(default_factory=list)
     memory_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
 
