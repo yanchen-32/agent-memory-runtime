@@ -1,6 +1,11 @@
 # Agent Memory Runtime 正式实验协议 v1.0
 
-状态：冻结版
+状态：已由 v1.1 取代（保留用于历史追溯）
+
+取代原因：2026-08-31 的方法补丁将 Answer F1、B1–Ours 配对
+Bootstrap、完整端到端时延、Query 交错运行、Adaptive Consolidation、
+NUMA × NEON 和 Trace Overhead 纳入正式验收。主指标和实验矩阵发生变化，
+依据本文件第 11 节不得无版本记录地覆盖，后续正式实验统一使用 v1.1。
 
 冻结日期：2026-08-28
 
@@ -503,4 +508,3 @@ E4_Ours_benchmark-v1.0_kunpeng_20260828_protocol-v1.0.json
 当前项目状态应表述为：
 
 > 实验基础设施和阶段性验证已完成，正式真实模型实验与鲲鹏性能证据仍在执行中。
-

@@ -13,6 +13,15 @@ class RuleMemoryExtractor:
 
     _fact_patterns = [
         re.compile(
+            r"(?P<subject>[^。！？]{1,40}?)(?:的)?(?P<predicate>数据库)"
+            r"(?:后来)?(?:仍)?(?:是|为|使用|改为|改成|确定为|：|:)?"
+            r"(?P<object>[^。！？]+)"
+        ),
+        re.compile(
+            r"(?P<subject>用户)(?:长期)?(?P<predicate>偏好)"
+            r"(?P<object>[^。！？]+)"
+        ),
+        re.compile(
             r"(?P<subject>[^。！？]{1,40}?)(?:的)?"
             r"(?P<predicate>截止日期|答辩日期|答辩时间|截止时间|部署平台|数据库|架构|项目名称)"
             r"(?:是|为|改为|改成|确定为|：|:)?(?P<object>[^。！？]+)"
@@ -37,6 +46,8 @@ class RuleMemoryExtractor:
                 predicate = match.group("predicate").strip()
                 if predicate == "答辩时间":
                     predicate = "答辩日期"
+                elif predicate in {"改为", "改成"}:
+                    predicate = "使用"
                 return (
                     match.group("subject").strip(" ，,：:"),
                     predicate,

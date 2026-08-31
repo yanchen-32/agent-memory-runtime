@@ -17,10 +17,13 @@ class BenchmarkCase:
     expected_version: str
     query_time: str
     difficulty: str
+    answer_aliases: list[str] = field(default_factory=list)
     token_budget: int | None = None
     memory_query_time: str | None = None
     forget_memory_ids: list[str] = field(default_factory=list)
     memory_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
+    forbidden_memory_ids: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 def load_jsonl(path: str | Path) -> list[BenchmarkCase]:

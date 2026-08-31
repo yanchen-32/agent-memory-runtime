@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from .base import Agent, LLMClient, estimate_tokens, select_context_indices
+import time
+
+from .base import (
+    ANSWER_FORMAT_INSTRUCTION,
+    Agent,
+    LLMClient,
+    estimate_tokens,
+    select_context_indices,
+    timed_generate,
+)
 
 
 class FullHistoryAgent(Agent):
@@ -23,6 +32,7 @@ class FullHistoryAgent(Agent):
         conversation: list[dict] | None = None,
         token_budget: int | None = None,
     ) -> str:
+        context_started = time.perf_counter()
         conversation = conversation or []
         lines = [
             f"MEMORY[{i}] {turn.get('content', '')}"
@@ -31,8 +41,9 @@ class FullHistoryAgent(Agent):
         ]
         header = (
             "You are a full-history baseline agent.\n"
-            "Use the conversation history below to answer the question. "
-            "If the history does not support an answer, answer UNKNOWN.\n\n"
+            "Use the conversation history below to answer the question.\n"
+            + ANSWER_FORMAT_INSTRUCTION
+            + "\n"
         )
         indices = select_context_indices(lines, query, token_budget, header)
         selected = [lines[i] for i in indices]
@@ -45,4 +56,7 @@ class FullHistoryAgent(Agent):
             + f"QUESTION: {query}\n"
         )
         self.last_prompt_tokens = estimate_tokens(self.last_prompt)
-        return self.client.generate(self.last_prompt)
+        self.last_memory_latency_ms = 0.0
+        self.last_context_latency_ms = (time.perf_counter() - context_started) * 1000
+        response, self.last_llm_latency_ms = timed_generate(self.client, self.last_prompt)
+        return response

@@ -15,6 +15,8 @@ class MemoryReaderV1:
         self.retriever = retriever
         self.reranker = reranker
         self.compressor = compressor or MemoryCompressor()
+        self.last_candidates = []
+        self.last_hits = []
 
     def read(
         self,
@@ -30,12 +32,14 @@ class MemoryReaderV1:
             user_id=user_id,
             query_time=point,
         )
+        self.last_candidates = list(candidates)
         hits = self.reranker.rerank(
             query,
             candidates,
             top_k=top_k,
             now=point or datetime.now(timezone.utc),
         )
+        self.last_hits = list(hits)
         context_parts: list[str] = []
         now = datetime.now(timezone.utc)
         for hit in hits:

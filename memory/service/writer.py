@@ -5,7 +5,14 @@ from datetime import datetime
 from memory.classification import RuleMemoryClassifier
 from memory.extraction import RuleMemoryExtractor
 from memory.governance import ConflictDetector, DedupDecision, Deduplicator, VersionedMemoryUpdater
-from memory.schema import MemoryAction, MemoryRecord, WriteResult, coerce_datetime, utcnow
+from memory.schema import (
+    MemoryAction,
+    MemoryRecord,
+    MemoryType,
+    WriteResult,
+    coerce_datetime,
+    utcnow,
+)
 from memory.scoring import ImportanceScorer
 from memory.storage import MemoryStore
 
@@ -37,11 +44,15 @@ class MemoryWriterV1:
         user_id: str = "default",
         session_id: str = "default",
         at: datetime | str | None = None,
+        memory_type_override: MemoryType | None = None,
+        preserve_duplicates: bool = False,
     ) -> list[WriteResult]:
         outputs: list[WriteResult] = []
         write_time = coerce_datetime(at) or utcnow()
         for candidate in self.extractor.extract(messages):
             memory_type, class_conf = self.classifier.classify(candidate)
+            if memory_type_override is not None:
+                memory_type = memory_type_override
             record = MemoryRecord(
                 user_id=user_id,
                 session_id=session_id,
@@ -61,7 +72,13 @@ class MemoryWriterV1:
             )
             active = self.store.list_active(user_id=user_id)
             dedup = self.deduplicator.check(record, active)
-            if dedup.decision in {DedupDecision.EXACT_DUPLICATE, DedupDecision.SEMANTIC_DUPLICATE}:
+            if (
+                not preserve_duplicates
+                and dedup.decision in {
+                    DedupDecision.EXACT_DUPLICATE,
+                    DedupDecision.SEMANTIC_DUPLICATE,
+                }
+            ):
                 outputs.append(
                     WriteResult(
                         MemoryAction.IGNORE,

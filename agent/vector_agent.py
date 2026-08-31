@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import time
+
 from .base import (
+    ANSWER_FORMAT_INSTRUCTION,
     Agent,
     LLMClient,
     estimate_tokens,
     select_context_indices,
+    timed_generate,
 )
 from memory.vector_store import VectorMemoryStore
 
@@ -24,13 +28,18 @@ class VectorMemoryAgent(Agent):
         return self.store.add_many(texts, metadata=metadata)
 
     def answer(self, query: str, token_budget: int | None = None) -> str:
+        memory_started = time.perf_counter()
         hits = self.store.search(query, top_k=self.top_k)
+        self.last_memory_latency_ms = (time.perf_counter() - memory_started) * 1000
+        context_started = time.perf_counter()
         lines = [
             f"MEMORY[{i}] {hit.content}" for i, hit in enumerate(hits, start=1)
         ]
         header = (
             "You are a vector-memory baseline agent.\n"
-            "Use only the retrieved memory below. If the memory does not support an answer, answer UNKNOWN.\n\n"
+            "Use only the retrieved memory below.\n"
+            + ANSWER_FORMAT_INSTRUCTION
+            + "\n"
         )
         indices = select_context_indices(lines, query, token_budget, header)
         selected_hits = [hits[i] for i in indices]
@@ -44,4 +53,6 @@ class VectorMemoryAgent(Agent):
             + f"QUESTION: {query}\n"
         )
         self.last_prompt_tokens = estimate_tokens(self.last_prompt)
-        return self.client.generate(self.last_prompt)
+        self.last_context_latency_ms = (time.perf_counter() - context_started) * 1000
+        response, self.last_llm_latency_ms = timed_generate(self.client, self.last_prompt)
+        return response

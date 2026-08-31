@@ -1,9 +1,17 @@
 from __future__ import annotations
 
 from datetime import datetime
+import time
 from uuid import uuid4
 
-from .base import Agent, LLMClient, estimate_tokens, select_context_indices
+from .base import (
+    ANSWER_FORMAT_INSTRUCTION,
+    Agent,
+    LLMClient,
+    estimate_tokens,
+    select_context_indices,
+    timed_generate,
+)
 from memory.embedding import EmbeddingModel, HashEmbeddingModel
 from memory.retrieval import BM25Retriever, HybridRetriever, VectorRetriever
 from memory.schema import MemoryRecord, coerce_datetime, utcnow
@@ -69,11 +77,16 @@ class HybridMemoryAgent(Agent):
         # query_time is intentionally ignored: B3 is a retrieval-only
         # baseline and does not claim temporal/version governance.
         del query_time
+        memory_started = time.perf_counter()
         hits = self.retriever.search(query, top_k=self.top_k)
+        self.last_memory_latency_ms = (time.perf_counter() - memory_started) * 1000
+        context_started = time.perf_counter()
         lines = [f"MEMORY[{i}] {hit.content}" for i, hit in enumerate(hits, start=1)]
         header = (
             "You are a hybrid-memory baseline agent.\n"
-            "Use only the retrieved memory below. If the memory does not support an answer, answer UNKNOWN.\n\n"
+            "Use only the retrieved memory below.\n"
+            + ANSWER_FORMAT_INSTRUCTION
+            + "\n"
         )
         indices = select_context_indices(lines, query, token_budget, header)
         selected_hits = [hits[i] for i in indices]
@@ -81,4 +94,6 @@ class HybridMemoryAgent(Agent):
         self.last_retrieved_ids = [hit.memory_id for hit in selected_hits]
         self.last_prompt = header + self.last_context + "\n\n" + f"QUESTION: {query}\n"
         self.last_prompt_tokens = estimate_tokens(self.last_prompt)
-        return self.client.generate(self.last_prompt)
+        self.last_context_latency_ms = (time.perf_counter() - context_started) * 1000
+        response, self.last_llm_latency_ms = timed_generate(self.client, self.last_prompt)
+        return response

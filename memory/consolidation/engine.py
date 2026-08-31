@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 import re
 from typing import Iterable
 from uuid import uuid4
 
 from memory.schema import MemoryRecord, MemoryStatus, MemoryType
 from memory.storage import MemoryStore
+from memory.context_budget import estimate_tokens
+from .policy import AdaptiveConsolidationPolicy, ConsolidationDecision
 
 
 @dataclass(slots=True)
@@ -16,6 +19,20 @@ class ConsolidationGroup:
     semantic_memory_id: str | None
     fidelity: float
     action: str
+    trigger_score: float | None = None
+    granularity_score: float | None = None
+    granularity_level: str = "normal"
+    policy_version: str = "fixed-v1"
+    tokens_before: int = 0
+    tokens_after: int = 0
+
+    @property
+    def compression_ratio(self) -> float:
+        return (
+            1.0 - self.tokens_after / self.tokens_before
+            if self.tokens_before > 0
+            else 0.0
+        )
 
 
 @dataclass(slots=True)
@@ -24,6 +41,8 @@ class ConsolidationReport:
     created_ids: list[str] = field(default_factory=list)
     updated_ids: list[str] = field(default_factory=list)
     skipped_groups: int = 0
+    skipped_by_policy: int = 0
+    conflict_blocked_groups: int = 0
 
     @property
     def source_count(self) -> int:
@@ -51,11 +70,17 @@ class MemoryConsolidator:
     intact and semantic records retain source_ids for traceability.
     """
 
-    def __init__(self, store: MemoryStore, min_group_size: int = 2):
+    def __init__(
+        self,
+        store: MemoryStore,
+        min_group_size: int = 2,
+        policy: AdaptiveConsolidationPolicy | None = None,
+    ):
         if min_group_size < 2:
             raise ValueError("min_group_size must be >= 2")
         self.store = store
         self.min_group_size = min_group_size
+        self.policy = policy
 
     @staticmethod
     def _normalise(value: str | None) -> str:
@@ -85,16 +110,36 @@ class MemoryConsolidator:
             ),
         )[-1]
 
-    def _summary(self, records: list[MemoryRecord]) -> str:
+    def _summary(self, records: list[MemoryRecord], granularity: str = "normal") -> str:
         canonical = self._canonical_record(records)
+        if granularity == "fine":
+            unique = list(dict.fromkeys(record.content for record in records))
+            return "语义记忆：" + "；".join(unique)
         if canonical.subject and canonical.predicate and canonical.object_value:
             return f"{canonical.subject}{canonical.predicate}{canonical.object_value}。"
-        return "综合记忆：" + "；".join(record.content for record in records)
+        if granularity == "coarse":
+            return canonical.content
+        return "综合记忆：" + "；".join(dict.fromkeys(record.content for record in records))
+
+    @staticmethod
+    def _unresolved_conflict_keys(records: list[MemoryRecord]) -> set[tuple[str, str]]:
+        values: dict[tuple[str, str], set[str]] = {}
+        for record in records:
+            if (
+                record.status == MemoryStatus.ACTIVE
+                and record.subject
+                and record.predicate
+                and record.object_value is not None
+            ):
+                key = (record.subject, record.predicate)
+                values.setdefault(key, set()).add(record.object_value)
+        return {key for key, objects in values.items() if len(objects) > 1}
 
     def consolidate(
         self,
         user_id: str | None = None,
         memory_type: MemoryType = MemoryType.EPISODIC,
+        now: datetime | None = None,
     ) -> ConsolidationReport:
         # Superseded episodic records are retained as historical evidence for
         # consolidation; archived records are excluded by lifecycle policy.
@@ -104,6 +149,18 @@ class MemoryConsolidator:
             if record.status != MemoryStatus.ARCHIVED
             and record.memory_type == memory_type
         ]
+        semantic_memories = [
+            record
+            for record in self.store.list_active(user_id=user_id)
+            if record.memory_type == MemoryType.SEMANTIC
+        ]
+        unresolved_conflicts = self._unresolved_conflict_keys(records)
+        total_tokens = sum(max(1, estimate_tokens(record.content)) for record in records)
+        storage_pressure = (
+            min(1.0, total_tokens / self.policy.storage_token_capacity)
+            if self.policy is not None
+            else 0.0
+        )
         grouped: dict[str, list[MemoryRecord]] = {}
         for record in records:
             grouped.setdefault(self._group_key(record), []).append(record)
@@ -113,6 +170,28 @@ class MemoryConsolidator:
             if len(source_records) < self.min_group_size:
                 report.skipped_groups += 1
                 continue
+            fact_key = (
+                (source_records[0].subject, source_records[0].predicate)
+                if source_records[0].subject and source_records[0].predicate
+                else None
+            )
+            conflict_risk = 1.0 if fact_key in unresolved_conflicts else 0.0
+            decision: ConsolidationDecision | None = None
+            if self.policy is not None:
+                decision = self.policy.decide(
+                    source_records,
+                    semantic_memories=semantic_memories,
+                    storage_pressure=storage_pressure,
+                    conflict_risk=conflict_risk,
+                    now=now,
+                )
+                if not decision.should_consolidate:
+                    report.skipped_groups += 1
+                    if decision.reason == "conflict_requires_version_governance":
+                        report.conflict_blocked_groups += 1
+                    else:
+                        report.skipped_by_policy += 1
+                    continue
             source_ids = sorted(record.memory_id for record in source_records)
             existing = next(
                 (
@@ -124,13 +203,18 @@ class MemoryConsolidator:
                 None,
             )
             canonical = self._canonical_record(source_records)
+            granularity = decision.granularity_level if decision else "normal"
+            summary = self._summary(source_records, granularity=granularity)
+            policy_version = self.policy.version if self.policy else "fixed-v1"
+            tokens_before = sum(max(1, estimate_tokens(record.content)) for record in source_records)
+            tokens_after = max(1, estimate_tokens(summary))
             if existing is None:
                 semantic = MemoryRecord(
                     memory_id=f"semantic-{uuid4().hex}",
                     user_id=canonical.user_id,
                     session_id=canonical.session_id,
                     memory_type=MemoryType.SEMANTIC,
-                    content=self._summary(source_records),
+                    content=summary,
                     entities=sorted({entity for r in source_records for entity in r.entities}),
                     keywords=sorted({keyword for r in source_records for keyword in r.keywords}),
                     event_time=canonical.event_time,
@@ -148,6 +232,13 @@ class MemoryConsolidator:
                         "consolidation_engine": "episodic-to-semantic-v1",
                         "consolidation_group": group_key,
                         "source_count": len(source_ids),
+                        "granularity_level": granularity,
+                        "consolidation_policy_version": policy_version,
+                        "trigger_score": decision.trigger_score if decision else None,
+                        "granularity_score": decision.granularity_score if decision else None,
+                        "tokens_before": tokens_before,
+                        "tokens_after": tokens_after,
+                        "compression_ratio": 1.0 - tokens_after / tokens_before,
                     },
                 )
                 self.store.add(semantic)
@@ -156,8 +247,17 @@ class MemoryConsolidator:
                 action = "created"
             else:
                 existing.source_ids = source_ids
-                existing.content = self._summary(source_records)
+                existing.content = summary
                 existing.metadata["source_count"] = len(source_ids)
+                existing.metadata.update({
+                    "granularity_level": granularity,
+                    "consolidation_policy_version": policy_version,
+                    "trigger_score": decision.trigger_score if decision else None,
+                    "granularity_score": decision.granularity_score if decision else None,
+                    "tokens_before": tokens_before,
+                    "tokens_after": tokens_after,
+                    "compression_ratio": 1.0 - tokens_after / tokens_before,
+                })
                 existing.valid_from = min(record.valid_from for record in source_records)
                 self.store.update(existing)
                 semantic_id = existing.memory_id
@@ -170,6 +270,12 @@ class MemoryConsolidator:
                     semantic_memory_id=semantic_id,
                     fidelity=1.0,
                     action=action,
+                    trigger_score=decision.trigger_score if decision else None,
+                    granularity_score=decision.granularity_score if decision else None,
+                    granularity_level=granularity,
+                    policy_version=policy_version,
+                    tokens_before=tokens_before,
+                    tokens_after=tokens_after,
                 )
             )
         return report

@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 import re
+import time
 from typing import Protocol
+
+
+ANSWER_FORMAT_INSTRUCTION = (
+    "Reply with only the shortest answer, or UNKNOWN if unsupported.\n"
+)
 
 
 class LLMClient(Protocol):
@@ -14,6 +20,12 @@ class Agent(ABC):
     @abstractmethod
     def answer(self, query: str) -> str:
         raise NotImplementedError
+
+
+def timed_generate(client: LLMClient, prompt: str) -> tuple[str, float]:
+    started = time.perf_counter()
+    response = client.generate(prompt)
+    return response, (time.perf_counter() - started) * 1000
 
 
 def estimate_tokens(text: str) -> int:

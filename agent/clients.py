@@ -27,7 +27,28 @@ class RuleBasedClient:
             if score > best_score:
                 best_score = score
                 best_line = content
-        return best_line or "UNKNOWN"
+        if not best_line:
+            return "UNKNOWN"
+
+        question_stem = re.sub(
+            r"(?:是什么|什么|哪一个|哪个|多少|哪里|谁|[？?])",
+            "",
+            question,
+        ).replace(" ", "")
+        compact_content = best_line.replace(" ", "")
+        if question_stem and compact_content.startswith(question_stem):
+            consumed = 0
+            split_at = 0
+            for split_at, character in enumerate(best_line, start=1):
+                if not character.isspace():
+                    consumed += 1
+                if consumed >= len(question_stem):
+                    break
+            short_answer = best_line[split_at:].strip(" ：:，,。.!！?？")
+            short_answer = re.sub(r"^(?:是|为)\s*", "", short_answer)
+            if short_answer:
+                return short_answer
+        return best_line
 
 
 class OpenAICompatibleClient:
@@ -45,20 +66,37 @@ class OpenAICompatibleClient:
         base_url: str | None = None,
         api_key: str | None = None,
         timeout: int = 60,
+        temperature: float = 0.0,
+        top_p: float = 1.0,
+        max_tokens: int | None = None,
+        thinking: str | None = "disabled",
     ):
         self.model = model or os.getenv("LLM_MODEL", "")
         self.base_url = (base_url or os.getenv("LLM_BASE_URL", "http://localhost:8000/v1")).rstrip("/")
         self.api_key = api_key or os.getenv("LLM_API_KEY", "EMPTY")
         self.timeout = timeout
+        self.temperature = temperature
+        self.top_p = top_p
+        self.max_tokens = max_tokens
+        self.thinking = thinking
+        self.last_usage: dict = {}
         if not self.model:
             raise ValueError("LLM model is required. Pass model=... or set LLM_MODEL.")
+        if thinking not in {None, "disabled", "enabled"}:
+            raise ValueError("thinking must be 'disabled', 'enabled', or None")
 
     def generate(self, prompt: str) -> str:
-        payload = json.dumps({
+        body = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
-            "temperature": 0,
-        }).encode("utf-8")
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+        }
+        if self.max_tokens is not None:
+            body["max_tokens"] = self.max_tokens
+        if self.thinking is not None:
+            body["thinking"] = {"type": self.thinking}
+        payload = json.dumps(body).encode("utf-8")
         req = request.Request(
             f"{self.base_url}/chat/completions",
             data=payload,
@@ -70,4 +108,5 @@ class OpenAICompatibleClient:
         )
         with request.urlopen(req, timeout=self.timeout) as resp:
             data = json.loads(resp.read().decode("utf-8"))
+        self.last_usage = data.get("usage", {})
         return data["choices"][0]["message"]["content"].strip()

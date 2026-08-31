@@ -26,3 +26,23 @@ def test_importance_plain_chitchat_is_lower():
     important = MemoryCandidate(content="请记住项目最终截止日期是9月15日", subject="项目", predicate="截止日期")
     casual = MemoryCandidate(content="今天食堂的面一般")
     assert scorer.score(important) > scorer.score(casual)
+
+
+def test_extractor_normalizes_database_updates_and_user_preferences():
+    extractor = RuleMemoryExtractor()
+    original, repeated, updated, preference = extractor.extract([
+        {"role": "user", "content": "项目数据库使用 openGauss。"},
+        {"role": "user", "content": "项目数据库后来仍使用 openGauss。"},
+        {"role": "user", "content": "项目数据库改为 SQLite。"},
+        {"role": "user", "content": "用户长期偏好简洁的技术报告。"},
+    ])
+    assert (original.subject, original.predicate, original.object_value) == (
+        "项目", "数据库", "openGauss"
+    )
+    assert (repeated.subject, repeated.predicate, repeated.object_value) == (
+        "项目", "数据库", "openGauss"
+    )
+    assert (updated.subject, updated.predicate, updated.object_value) == (
+        "项目", "数据库", "SQLite"
+    )
+    assert (preference.subject, preference.predicate) == ("用户", "偏好")

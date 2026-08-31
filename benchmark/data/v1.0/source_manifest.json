@@ -1,0 +1,48 @@
+{
+  "manifest_version": "1.0",
+  "audited_at": "2026-08-31",
+  "sources": [
+    {
+      "name": "LongMemEval-S-Cleaned",
+      "role": "external_test",
+      "repository": "xiaowu0162/longmemeval-cleaned",
+      "repository_url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned",
+      "revision": "98d7416c24c778c2fee6e6f3006e7a073259d48f",
+      "file": "longmemeval_s_cleaned.json",
+      "sha256": "d6f21ea9d60a0d56f34a05b609c79c88a451d2ae03597821ea3d5a9678c3a442",
+      "license": "MIT",
+      "language": "en",
+      "case_count": 500,
+      "question_type_counts": {
+        "knowledge-update": 78,
+        "multi-session": 133,
+        "single-session-assistant": 56,
+        "single-session-preference": 30,
+        "single-session-user": 70,
+        "temporal-reasoning": 133
+      },
+      "abstention_case_count": 30,
+      "duplicate_session_id_audit": {
+        "affected_cases": 13,
+        "extra_occurrences": 13,
+        "duplicated_answer_session_ids": 0,
+        "adapter_policy": "suffix repeated filler IDs with __occN; fail on repeated answer IDs"
+      },
+      "ground_truth_policy": "preserve upstream question, answer, and answer_session_ids",
+      "converted_artifact": {
+        "format": "AMR Benchmark v1 JSONL",
+        "local_path": ".datasets/converted/longmemeval_s_v1.jsonl",
+        "sha256": "40102745bbe619524dc0f5e93b3a7223c1f040bcf55a676f5eccd68fc0e84bdb",
+        "case_count": 500,
+        "category_counts": {
+          "abstention": 30,
+          "fact_recall": 120,
+          "multi_hop": 121,
+          "semantic_recall": 30,
+          "temporal": 127,
+          "update": 72
+        }
+      }
+    }
+  ]
+}
