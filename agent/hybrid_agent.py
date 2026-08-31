@@ -9,7 +9,9 @@ from .base import (
     Agent,
     LLMClient,
     estimate_tokens,
+    memory_line,
     select_context_indices,
+    temporal_header,
     timed_generate,
 )
 from memory.embedding import EmbeddingModel, HashEmbeddingModel
@@ -62,6 +64,7 @@ class HybridMemoryAgent(Agent):
                 content=content,
                 created_at=timestamp,
                 valid_from=timestamp,
+                valid_to=coerce_datetime(message.get("valid_to")),
                 metadata={"role": message.get("role", "user"), "baseline": "B3"},
             )
             self.store.add(record)
@@ -73,18 +76,30 @@ class HybridMemoryAgent(Agent):
         query: str,
         token_budget: int | None = None,
         query_time: datetime | str | None = None,
+        temporal_context: bool = False,
     ) -> str:
-        # query_time is intentionally ignored: B3 is a retrieval-only
-        # baseline and does not claim temporal/version governance.
-        del query_time
+        # B3 receives time metadata only for prompt interpretation. Retrieval
+        # itself remains unfiltered and does not claim temporal governance.
         memory_started = time.perf_counter()
         hits = self.retriever.search(query, top_k=self.top_k)
         self.last_memory_latency_ms = (time.perf_counter() - memory_started) * 1000
         context_started = time.perf_counter()
-        lines = [f"MEMORY[{i}] {hit.content}" for i, hit in enumerate(hits, start=1)]
+        lines = []
+        for index, hit in enumerate(hits, start=1):
+            record = self.store.get(hit.memory_id)
+            lines.append(
+                memory_line(
+                    index,
+                    hit.content,
+                    temporal_context=temporal_context,
+                    valid_from=record.valid_from if record is not None else None,
+                    valid_to=record.valid_to if record is not None else None,
+                )
+            )
         header = (
             "You are a hybrid-memory baseline agent.\n"
             "Use only the retrieved memory below.\n"
+            + temporal_header(query_time, temporal_context)
             + ANSWER_FORMAT_INSTRUCTION
             + "\n"
         )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 import time
 
 from .base import (
@@ -7,7 +8,9 @@ from .base import (
     Agent,
     LLMClient,
     estimate_tokens,
+    memory_line,
     select_context_indices,
+    temporal_header,
     timed_generate,
 )
 
@@ -31,6 +34,8 @@ class FullHistoryAgent(Agent):
         query: str,
         conversation: list[dict] | None = None,
         token_budget: int | None = None,
+        query_time: datetime | str | None = None,
+        temporal_context: bool = False,
     ) -> str:
         context_started = time.perf_counter()
         conversation = conversation or []
@@ -39,12 +44,24 @@ class FullHistoryAgent(Agent):
             content = str(turn.get("content", "")).strip()
             if not content:
                 continue
-            timestamp = turn.get("valid_from") or turn.get("created_at")
-            time_prefix = f" TIME[{timestamp}]" if timestamp else ""
-            lines.append(f"MEMORY[{index}]{time_prefix} {content}")
+            if temporal_context:
+                lines.append(
+                    memory_line(
+                        index,
+                        content,
+                        temporal_context=True,
+                        valid_from=turn.get("valid_from") or turn.get("created_at"),
+                        valid_to=turn.get("valid_to"),
+                    )
+                )
+            else:
+                timestamp = turn.get("valid_from") or turn.get("created_at")
+                time_prefix = f" TIME[{timestamp}]" if timestamp else ""
+                lines.append(f"MEMORY[{index}]{time_prefix} {content}")
         header = (
             "You are a full-history baseline agent.\n"
             "Use the conversation history below to answer the question.\n"
+            + temporal_header(query_time, temporal_context)
             + ANSWER_FORMAT_INSTRUCTION
             + "\n"
         )

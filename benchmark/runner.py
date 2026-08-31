@@ -113,17 +113,30 @@ def _invoke(
             case.query,
             conversation=case.conversation,
             token_budget=token_budget,
+            query_time=case.memory_query_time,
+            temporal_context=case.category == "temporal",
         )
     if agent_name == "B2":
-        return agent.answer(case.query, token_budget=token_budget)
+        return agent.answer(
+            case.query,
+            token_budget=token_budget,
+            query_time=case.memory_query_time,
+            temporal_context=case.category == "temporal",
+        )
     if agent_name == "B3":
-        return agent.answer(case.query, token_budget=token_budget)
+        return agent.answer(
+            case.query,
+            token_budget=token_budget,
+            query_time=case.memory_query_time,
+            temporal_context=case.category == "temporal",
+        )
     return agent.answer(
         case.query,
         token_budget=token_budget,
         query_time=case.memory_query_time,
         trace_id=trace_id,
         query_id=case.case_id,
+        temporal_context=case.category == "temporal",
     )
 
 
@@ -201,7 +214,14 @@ def run_case(
         ]
         store.add_many(
             [str(turn["content"]) for turn in turns],
-            metadata=[{"role": turn.get("role", "user")} for turn in turns],
+            metadata=[
+                {
+                    "role": turn.get("role", "user"),
+                    "valid_from": turn.get("valid_from") or turn.get("created_at"),
+                    "valid_to": turn.get("valid_to"),
+                }
+                for turn in turns
+            ],
             memory_ids=[str(turn.get("memory_id")) for turn in turns],
         )
         agent = VectorMemoryAgent(client, store, top_k=top_k)

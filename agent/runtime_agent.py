@@ -11,6 +11,8 @@ from .base import (
     Agent,
     LLMClient,
     estimate_tokens,
+    memory_line,
+    temporal_header,
     timed_generate,
 )
 
@@ -76,6 +78,7 @@ class MemoryRuntimeAgent(Agent):
         query_time: datetime | str | None = None,
         trace_id: str | None = None,
         query_id: str | None = None,
+        temporal_context: bool = False,
     ) -> str:
         memory_started = time.perf_counter()
         result = self.runtime.read(
@@ -91,6 +94,7 @@ class MemoryRuntimeAgent(Agent):
         header = (
             "You are an Agent Memory Runtime agent.\n"
             "Use only the retrieved memory below.\n"
+            + temporal_header(query_time, temporal_context)
             + ANSWER_FORMAT_INSTRUCTION
             + "\n"
         )
@@ -105,10 +109,18 @@ class MemoryRuntimeAgent(Agent):
             query_id=query_id,
         )
         selected_hits = selection.selected
-        selected_lines = [
-            f"MEMORY[{i}] {hit.content}"
-            for i, hit in enumerate(selected_hits, start=1)
-        ]
+        selected_lines = []
+        for index, hit in enumerate(selected_hits, start=1):
+            record = self.runtime.store.get(hit.memory_id)
+            selected_lines.append(
+                memory_line(
+                    index,
+                    hit.content,
+                    temporal_context=temporal_context,
+                    valid_from=record.valid_from if record is not None else None,
+                    valid_to=record.valid_to if record is not None else None,
+                )
+            )
         self.last_context = "\n".join(selected_lines)
         self.last_retrieved_ids = [hit.memory_id for hit in selected_hits]
         self.last_retrieved_contents = [hit.content for hit in selected_hits]

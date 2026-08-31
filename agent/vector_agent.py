@@ -7,7 +7,9 @@ from .base import (
     Agent,
     LLMClient,
     estimate_tokens,
+    memory_line,
     select_context_indices,
+    temporal_header,
     timed_generate,
 )
 from memory.vector_store import VectorMemoryStore
@@ -27,17 +29,31 @@ class VectorMemoryAgent(Agent):
     def ingest(self, texts: list[str], metadata: list[dict] | None = None) -> list[str]:
         return self.store.add_many(texts, metadata=metadata)
 
-    def answer(self, query: str, token_budget: int | None = None) -> str:
+    def answer(
+        self,
+        query: str,
+        token_budget: int | None = None,
+        query_time: str | None = None,
+        temporal_context: bool = False,
+    ) -> str:
         memory_started = time.perf_counter()
         hits = self.store.search(query, top_k=self.top_k)
         self.last_memory_latency_ms = (time.perf_counter() - memory_started) * 1000
         context_started = time.perf_counter()
         lines = [
-            f"MEMORY[{i}] {hit.content}" for i, hit in enumerate(hits, start=1)
+            memory_line(
+                i,
+                hit.content,
+                temporal_context=temporal_context,
+                valid_from=hit.metadata.get("valid_from"),
+                valid_to=hit.metadata.get("valid_to"),
+            )
+            for i, hit in enumerate(hits, start=1)
         ]
         header = (
             "You are a vector-memory baseline agent.\n"
             "Use only the retrieved memory below.\n"
+            + temporal_header(query_time, temporal_context)
             + ANSWER_FORMAT_INSTRUCTION
             + "\n"
         )
