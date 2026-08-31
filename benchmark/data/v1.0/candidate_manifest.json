@@ -36,6 +36,15 @@
   },
   "review": {
     "file": "review_checklist.csv",
+    "ai_prereview_status": "passed",
+    "ai_prereview_date": "2026-08-31",
+    "ai_prereview_file": "docs/benchmark_v1_ai_prereview.md",
+    "ai_prereviewed_case_count": 36,
+    "human_reviewer_status": "signed",
+    "human_reviewers": [
+      "Zhang"
+    ],
+    "superseded_by": "frozen_manifest.json",
     "required_fields": [
       "question_clear",
       "answer_correct",

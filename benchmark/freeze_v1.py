@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 
+from .artifacts import sha256_file
 from .validate_splits import validate_splits
 
 
@@ -46,13 +47,24 @@ def freeze_benchmark(data_dir: str | Path, review_path: str | Path) -> dict:
             f"human review incomplete for {len(pending)} case(s): {pending[:5]}"
         )
 
+    portable_splits = {
+        split: {
+            "file": f"{split}.jsonl",
+            **{key: value for key, value in report.items() if key != "path"},
+        }
+        for split, report in validation["splits"].items()
+    }
+    reviewers = sorted({row["reviewer"].strip() for row in reviews})
     manifest = {
         **validation,
         "benchmark_version": "1.0",
         "status": "frozen",
+        "splits": portable_splits,
         "frozen_at": datetime.now(timezone.utc).isoformat(),
         "review_file": str(Path(review_path).name),
+        "review_sha256": sha256_file(review_path),
         "reviewed_case_count": len(expected_ids),
+        "reviewers": reviewers,
     }
     output = root / "frozen_manifest.json"
     output.write_text(

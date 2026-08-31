@@ -1,0 +1,127 @@
+{
+  "benchmark_version": "1.0",
+  "status": "frozen",
+  "valid": true,
+  "total_cases": 36,
+  "governance_pairs": 6,
+  "splits": {
+    "development": {
+      "file": "development.jsonl",
+      "cases": 12,
+      "categories": {
+        "abstention": 1,
+        "budget": 1,
+        "conflict": 1,
+        "fact_recall": 1,
+        "forgetting": 1,
+        "long_context": 1,
+        "multi_hop": 1,
+        "noise": 1,
+        "semantic_recall": 1,
+        "temporal": 2,
+        "update": 1
+      },
+      "valid": true,
+      "sha256": "6bdfb653ec170343bc4f7ac8983fa541c5717eab26c1bdbc495cfc7426693b34",
+      "case_ids": [
+        "dev_update_db_current_001",
+        "dev_update_db_history_001",
+        "dev_conflict_platform_current_001",
+        "dev_conflict_platform_history_001",
+        "dev_fact_name_001",
+        "dev_abstention_owner_phone_001",
+        "dev_semantic_memory_type_001",
+        "dev_noise_dimension_001",
+        "dev_budget_topk_001",
+        "dev_multihop_deploy_001",
+        "dev_forgetting_port_001",
+        "dev_long_context_codename_001"
+      ],
+      "scenario_families": [
+        "dev_deployment_governance",
+        "dev_research_runtime"
+      ]
+    },
+    "test": {
+      "file": "test.jsonl",
+      "cases": 12,
+      "categories": {
+        "abstention": 1,
+        "budget": 1,
+        "conflict": 1,
+        "fact_recall": 1,
+        "forgetting": 1,
+        "long_context": 1,
+        "multi_hop": 1,
+        "noise": 1,
+        "semantic_recall": 1,
+        "temporal": 2,
+        "update": 1
+      },
+      "valid": true,
+      "sha256": "4580c3968475dfe3726767e6a3859d21a7d3f9861bfbbf71ab050aaf76ceddf8",
+      "case_ids": [
+        "test_update_db_current_001",
+        "test_update_db_history_001",
+        "test_conflict_platform_current_001",
+        "test_conflict_platform_history_001",
+        "test_fact_name_001",
+        "test_abstention_budget_001",
+        "test_semantic_memory_type_001",
+        "test_noise_batch_001",
+        "test_budget_recall_001",
+        "test_multihop_quality_001",
+        "test_forgetting_code_001",
+        "test_long_context_codename_001"
+      ],
+      "scenario_families": [
+        "test_quality_inspection",
+        "test_supply_chain"
+      ]
+    },
+    "holdout": {
+      "file": "holdout.jsonl",
+      "cases": 12,
+      "categories": {
+        "abstention": 1,
+        "budget": 1,
+        "conflict": 1,
+        "fact_recall": 1,
+        "forgetting": 1,
+        "long_context": 1,
+        "multi_hop": 1,
+        "noise": 1,
+        "semantic_recall": 1,
+        "temporal": 2,
+        "update": 1
+      },
+      "valid": true,
+      "sha256": "c8bac78e2a2c47b7aaef4009a786ef48af779a45239c1959b92801714b697733",
+      "case_ids": [
+        "holdout_update_db_current_001",
+        "holdout_update_db_history_001",
+        "holdout_conflict_platform_current_001",
+        "holdout_conflict_platform_history_001",
+        "holdout_fact_name_001",
+        "holdout_abstention_owner_001",
+        "holdout_semantic_memory_type_001",
+        "holdout_noise_window_001",
+        "holdout_budget_candidates_001",
+        "holdout_multihop_production_001",
+        "holdout_forgetting_token_001",
+        "holdout_long_context_codename_001"
+      ],
+      "scenario_families": [
+        "holdout_energy_management",
+        "holdout_production_line"
+      ]
+    }
+  },
+  "frozen_at": "2026-08-31T07:22:03.802191+00:00",
+  "review_file": "review_checklist.csv",
+  "review_sha256": "a782b07a73a2049338623bc1b58fd0280584ac7e949a031a6713d846ef8df6d9",
+  "reviewed_case_count": 36,
+  "reviewers": [
+    "Zhang"
+  ]
+}

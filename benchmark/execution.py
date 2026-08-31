@@ -66,6 +66,13 @@ def require_frozen_benchmark(path: str | Path) -> dict:
         raise ValueError(f"benchmark split is not present in frozen manifest: {split}")
     if split_data.get("sha256") != _sha256_file(benchmark_path):
         raise ValueError(f"benchmark hash no longer matches frozen manifest: {split}")
+    review_file = manifest.get("review_file")
+    review_sha256 = manifest.get("review_sha256")
+    if not review_file or not review_sha256:
+        raise ValueError("frozen benchmark manifest lacks review integrity metadata")
+    review_path = benchmark_path.parent / str(review_file)
+    if not review_path.exists() or review_sha256 != _sha256_file(review_path):
+        raise ValueError("human review no longer matches frozen manifest")
     return manifest
 
 

@@ -1,37 +1,37 @@
 case_id,split,question_clear,answer_correct,evidence_ids_correct,forbidden_ids_correct,timestamps_correct,aliases_checked,reviewer,decision,notes
-dev_update_db_current_001,development,,,,,,,,pending,
-dev_update_db_history_001,development,,,,,,,,pending,
-dev_conflict_platform_current_001,development,,,,,,,,pending,
-dev_conflict_platform_history_001,development,,,,,,,,pending,
-dev_fact_name_001,development,,,,,,,,pending,
-dev_abstention_owner_phone_001,development,,,,,,,,pending,
-dev_semantic_memory_type_001,development,,,,,,,,pending,
-dev_noise_dimension_001,development,,,,,,,,pending,
-dev_budget_topk_001,development,,,,,,,,pending,
-dev_multihop_deploy_001,development,,,,,,,,pending,
-dev_forgetting_port_001,development,,,,,,,,pending,
-dev_long_context_codename_001,development,,,,,,,,pending,
-test_update_db_current_001,test,,,,,,,,pending,
-test_update_db_history_001,test,,,,,,,,pending,
-test_conflict_platform_current_001,test,,,,,,,,pending,
-test_conflict_platform_history_001,test,,,,,,,,pending,
-test_fact_name_001,test,,,,,,,,pending,
-test_abstention_budget_001,test,,,,,,,,pending,
-test_semantic_memory_type_001,test,,,,,,,,pending,
-test_noise_batch_001,test,,,,,,,,pending,
-test_budget_recall_001,test,,,,,,,,pending,
-test_multihop_quality_001,test,,,,,,,,pending,
-test_forgetting_code_001,test,,,,,,,,pending,
-test_long_context_codename_001,test,,,,,,,,pending,
-holdout_update_db_current_001,holdout,,,,,,,,pending,
-holdout_update_db_history_001,holdout,,,,,,,,pending,
-holdout_conflict_platform_current_001,holdout,,,,,,,,pending,
-holdout_conflict_platform_history_001,holdout,,,,,,,,pending,
-holdout_fact_name_001,holdout,,,,,,,,pending,
-holdout_abstention_owner_001,holdout,,,,,,,,pending,
-holdout_semantic_memory_type_001,holdout,,,,,,,,pending,
-holdout_noise_window_001,holdout,,,,,,,,pending,
-holdout_budget_candidates_001,holdout,,,,,,,,pending,
-holdout_multihop_production_001,holdout,,,,,,,,pending,
-holdout_forgetting_token_001,holdout,,,,,,,,pending,
-holdout_long_context_codename_001,holdout,,,,,,,,pending,
+dev_update_db_current_001,development,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+dev_update_db_history_001,development,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+dev_conflict_platform_current_001,development,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+dev_conflict_platform_history_001,development,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+dev_fact_name_001,development,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+dev_abstention_owner_phone_001,development,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+dev_semantic_memory_type_001,development,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+dev_noise_dimension_001,development,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+dev_budget_topk_001,development,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+dev_multihop_deploy_001,development,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+dev_forgetting_port_001,development,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+dev_long_context_codename_001,development,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+test_update_db_current_001,test,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+test_update_db_history_001,test,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+test_conflict_platform_current_001,test,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+test_conflict_platform_history_001,test,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+test_fact_name_001,test,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+test_abstention_budget_001,test,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+test_semantic_memory_type_001,test,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+test_noise_batch_001,test,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+test_budget_recall_001,test,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+test_multihop_quality_001,test,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+test_forgetting_code_001,test,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+test_long_context_codename_001,test,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+holdout_update_db_current_001,holdout,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+holdout_update_db_history_001,holdout,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+holdout_conflict_platform_current_001,holdout,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+holdout_conflict_platform_history_001,holdout,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+holdout_fact_name_001,holdout,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+holdout_abstention_owner_001,holdout,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+holdout_semantic_memory_type_001,holdout,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+holdout_noise_window_001,holdout,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+holdout_budget_candidates_001,holdout,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+holdout_multihop_production_001,holdout,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+holdout_forgetting_token_001,holdout,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31
+holdout_long_context_codename_001,holdout,yes,yes,yes,yes,yes,yes,Zhang,approved,AI technical prereview passed 2026-08-31

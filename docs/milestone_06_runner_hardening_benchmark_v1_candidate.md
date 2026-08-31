@@ -38,12 +38,13 @@ Date: 2026-08-31
 - A 72-row, three-repeat B1/Ours checkpoint resumed without adding duplicate
   rows and emitted the full formal artifact bundle.
 
-## Pending human gate
+## Completed human gate
 
-`development.jsonl`, `test.jsonl`, and `holdout.jsonl` remain candidates. The
-36-row `review_checklist.csv` has not been signed by a human reviewer, so no
-`frozen_manifest.json` exists and formal results are not allowed. The freeze
-command will record final hashes only after every review field is approved.
+All 36 rows passed the six-field AI technical prereview, with the trace recorded
+in `docs/benchmark_v1_ai_prereview.md`. Human Reviewer `Zhang` signed all rows,
+and `frozen_manifest.json` now locks the Development/Test/Holdout hashes plus
+the signed checklist hash. Hash-matching Benchmark v1.0 splits may now support
+formal E1/E2 runs.
 
 E5 Consolidation continues to use its separate v0.1 benchmark and requires a
 separate reviewed v1 data family before formal E5 claims.

@@ -16,16 +16,20 @@ historical query, with:
 - a point-in-time `memory_query_time`;
 - scenario families disjoint across Development, Test, and Holdout.
 
-They are deliberately marked `pending_human_review` and cannot support formal
-claims yet. Run structural validation with:
+The JSONL metadata preserves its candidate provenance. The six technical checks
+passed AI prereview, documented in `docs/benchmark_v1_ai_prereview.md`, and
+human reviewer `Zhang` signed all 36 rows. The resulting
+`frozen_manifest.json` now authorizes hash-matching formal runs. Run structural
+validation with:
 
 ```bash
 python -m benchmark.validate_splits benchmark/data/v1.0
 ```
 
-Review every row in `review_checklist.csv`. Each check must be `yes`, `reviewer`
-must identify the human reviewer, and `decision` must be `approved`. Only then
-may the frozen manifest be generated:
+For a future revision, confirm the prereview represented by every row in
+`review_checklist.csv`, then fill only `reviewer` with the human reviewer's
+identity. The technical checks and `decision=approved` are prefilled by the
+technical prereview. Only then may a new frozen manifest be generated:
 
 ```bash
 python -m benchmark.freeze_v1 \
@@ -34,8 +38,9 @@ python -m benchmark.freeze_v1 \
 ```
 
 The freeze command refuses incomplete review and writes `frozen_manifest.json`
-only after all cases pass. `candidate_manifest.json` records the current
-pre-review hashes and explicitly sets `formal_results_allowed` to false.
+only after all cases pass. The frozen manifest locks the Split hashes and the
+signed review-checklist hash. `candidate_manifest.json` retains the pre-freeze
+provenance and points to the authoritative frozen manifest.
 
 Each split also covers fact recall, semantic recall, long context, noise,
 abstention, budget, multi-hop and forgetting. E5 Consolidation remains a

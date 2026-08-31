@@ -75,10 +75,10 @@ are retained as `status=failed` rows without storing response bodies or secrets.
 The Sentence Transformer weights are loaded once per process, while each case
 uses an isolated embedding cache and batched document encoding.
 
-Benchmark v1.0 candidate split validation and human-review freeze are documented
-in `benchmark/data/v1.0/README.md`. Formal `run_e1_e2.py` runs require a matching
-`frozen_manifest.json`; use `--allow-unreviewed-benchmark` only for Development
-pilots whose outputs cannot support formal claims.
+Benchmark v1.0 validation and its completed human-review freeze are documented
+in `benchmark/data/v1.0/README.md`. Formal `run_e1_e2.py` runs require the
+matching signed `frozen_manifest.json`; use `--allow-unreviewed-benchmark` only
+for Development pilots whose outputs cannot support formal claims.
 
 The default implementation is offline and deterministic. RuleBasedClient and
 HashEmbeddingModel are smoke-test tools only. Formal results must use the same
@@ -171,7 +171,7 @@ Run an offline, non-formal infrastructure smoke with three repeats:
 python experiments/run_e1_e2.py --allow-unreviewed-benchmark
 ~~~
 
-After human review creates `benchmark/data/v1.0/frozen_manifest.json`, run the
+The signed `benchmark/data/v1.0/frozen_manifest.json` is checked in. Run the
 frozen Test split without the override:
 
 ~~~bash
