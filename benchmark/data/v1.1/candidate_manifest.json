@@ -1,0 +1,46 @@
+{
+  "benchmark_version": "1.1-candidate",
+  "deep_audit": {
+    "file": "deep_audit.json",
+    "sha256": "5134d23a2d872ecadd4c3738e961baf2302582514bb9cebad6b8cfc42d5fc515",
+    "status": "passed_pending_human_review",
+    "valid": true,
+    "version": "v1.1.0"
+  },
+  "generator_version": "v1.1.1",
+  "review_file": "review_checklist.csv",
+  "review_sha256": "d9469d5d842ae6164a267001964a968188896588f14c8f932768783bc0a7d205",
+  "review_signoff": {
+    "file": "review_signoff.json",
+    "scope": "all_development_test_holdout_candidates",
+    "unsigned_template_sha256": "64d8c20f142d006b245f23c2abf3dc86c4a041febf980845e705dd4cd967c845"
+  },
+  "seed": 20260831,
+  "signoff_file": "review_signoff.json",
+  "splits": {
+    "development": {
+      "case_count": 288,
+      "file": "development.jsonl",
+      "sha256": "c32d229b3253b2e2a7a2167a9c4e061f8ad9f637779d3c1fb798952439a45ea8"
+    },
+    "holdout": {
+      "case_count": 96,
+      "file": "holdout.jsonl",
+      "sha256": "b2ac2a367c1f96cd8765dc55c5a35993b99f08ff213e2e48cf54ddc61eecb2c4"
+    },
+    "test": {
+      "case_count": 96,
+      "file": "test.jsonl",
+      "sha256": "fc1bcf164c713ddceefaf45cfe375f3b696ca834905ce85ef18b237df89b1059"
+    }
+  },
+  "status": "pending_human_review",
+  "technical_prereview": {
+    "checked_cases": 480,
+    "file": "ai_prereview.md",
+    "sha256": "6d2c09aaf212bb68a776169e3ce575986cfea8c753f6bef7c4745798ecbd4cfa",
+    "technical_failures": 0,
+    "version": "v1.1.1"
+  },
+  "total_case_count": 480
+}

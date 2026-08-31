@@ -1,0 +1,98 @@
+{
+  "manifest_version": "1.1-draft",
+  "status": "admitted_sources_downloaded",
+  "updated_at": "2026-08-31",
+  "tracks": [
+    {
+      "name": "AMR-CN-Governance-v1.1",
+      "role": "project_owned_primary",
+      "language": "zh",
+      "target_case_count": 480,
+      "source_type": "project_owned",
+      "derivation_policy": "independent_authoring_from_capability_spec_only",
+      "upstream_text_or_labels_included": false,
+      "status": "planned"
+    },
+    {
+      "name": "LongMemEval-S-Cleaned",
+      "role": "external_immutable_memory",
+      "repository": "xiaowu0162/longmemeval-cleaned",
+      "repository_url": "https://huggingface.co/datasets/xiaowu0162/longmemeval-cleaned",
+      "revision": "98d7416c24c778c2fee6e6f3006e7a073259d48f",
+      "file": "longmemeval_s_cleaned.json",
+      "sha256": "d6f21ea9d60a0d56f34a05b609c79c88a451d2ae03597821ea3d5a9678c3a442",
+      "license": "MIT",
+      "language": "en",
+      "case_count": 500,
+      "adapter": "benchmark.adapters.longmemeval",
+      "ground_truth_policy": "lossless_conversion_only",
+      "status": "admitted"
+    },
+    {
+      "name": "LongBench-v1-Chinese",
+      "role": "external_e3_length_stress",
+      "repository": "THUDM/LongBench",
+      "repository_url": "https://github.com/THUDM/LongBench",
+      "repository_revision": "2e00731f8d0bff23dc4325161044d0ed8af94c1e",
+      "repository_license": "MIT",
+      "data_url": "https://huggingface.co/datasets/THUDM/LongBench/resolve/main/data.zip",
+      "data_zip_sha256": "cb45b11a4133c6bc1d6a44b0f8e701335ff1e543195db1103472e575857f7f64",
+      "selected_data_license_note": "LongBench repository is MIT; every selected upstream component is retained unchanged with LongBench attribution and must be redistributed only after its individual upstream notice is included.",
+      "language": "zh",
+      "ground_truth_policy": "lossless_conversion_only",
+      "local_path": ".datasets/longbench/data/data",
+      "selected_files": [
+        {
+          "name": "multifieldqa_zh.jsonl",
+          "sha256": "e5b4fd1a437c53c1c9e4e31eda7a259110b06d14be79c3ec455008c11fb9fab5",
+          "case_count": 200
+        },
+        {
+          "name": "dureader.jsonl",
+          "sha256": "09d1054f8b2610ffd3f5f0b7710e8c77a58c3afeb90c3da60ffda5ad7e94eedf",
+          "case_count": 200
+        },
+        {
+          "name": "vcsum.jsonl",
+          "sha256": "d7412361c418794607c801067c7542254ed5220e1f3ec174dfddc6710ded0e50",
+          "case_count": 200
+        },
+        {
+          "name": "lsht.jsonl",
+          "sha256": "b57834ed102ce3a6dbc501f4005016b1fe883371ba48b381c1d1f698291a4bdd",
+          "case_count": 200
+        },
+        {
+          "name": "passage_retrieval_zh.jsonl",
+          "sha256": "d71c1f71f9fee4c2108f822e9c58ac3cef94db47902c40ddfe168ecb5aab3cc0",
+          "case_count": 200
+        }
+      ],
+      "case_count": 1000,
+      "status": "downloaded_and_pinned_pending_component_notice_audit"
+    },
+    {
+      "name": "RULER",
+      "role": "external_e3_synthetic_length_stress",
+      "repository": "NVIDIA/RULER",
+      "repository_url": "https://github.com/NVIDIA/RULER",
+      "repository_revision": "c3f5e3b4f87f97e048793bb510a3a6b19a46bf3a",
+      "repository_license": "Apache-2.0",
+      "config_file": "scripts/synthetic.yaml",
+      "config_sha256": "34bc71dcacdc41a829a170f04b528fbf48d62c616338005ab4991680fbf8cb0b",
+      "local_path": ".datasets/ruler",
+      "data_policy": "RULER publishes a deterministic synthetic data generator rather than a static dataset. Generated artifacts must record task configuration, sequence length, tokenizer, seed, and source-material notices.",
+      "ground_truth_policy": "lossless_generation_config_only",
+      "status": "generator_downloaded_and_pinned"
+    },
+    {
+      "name": "LoCoMo",
+      "role": "not_admitted",
+      "repository": "snap-research/locomo",
+      "repository_url": "https://github.com/snap-research/locomo",
+      "license": "CC BY-NC 4.0",
+      "reason": "non-commercial data licence is unsuitable for this planned competition deliverable",
+      "status": "rejected"
+    }
+  ]
+}

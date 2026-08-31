@@ -1,0 +1,88 @@
+{
+  "audit_version": "v1.1.0",
+  "benchmark_version": "1.1-candidate",
+  "case_count": 480,
+  "case_grain": "one question over one conversation; governance scenarios have paired current/historical questions",
+  "category_counts": {
+    "abstention": 40,
+    "budget": 40,
+    "conflict": 40,
+    "fact_recall": 40,
+    "forgetting": 40,
+    "long_context": 40,
+    "multi_hop": 40,
+    "noise": 40,
+    "semantic_recall": 40,
+    "temporal": 80,
+    "update": 40
+  },
+  "checks": {
+    "ambiguous_non_evidence_answers": 0,
+    "answers_exposed_in_questions": 0,
+    "cross_split_content_overlap": {
+      "development/holdout": 0,
+      "development/test": 0,
+      "test/holdout": 0
+    },
+    "cross_split_query_overlap": {
+      "development/holdout": 0,
+      "development/test": 0,
+      "test/holdout": 0
+    },
+    "future_expected_evidence": 0,
+    "global_unique_case_ids": 480,
+    "global_unique_queries": 480,
+    "human_signatures_present": 0,
+    "long_context_case_count": 40,
+    "long_context_chars_max": 1903,
+    "long_context_chars_min": 1901,
+    "long_context_memory_depth_max": 64,
+    "long_context_memory_depth_min": 64,
+    "max_normalized_shell_group": 4,
+    "normalized_query_shells": 216,
+    "review_rows": 480,
+    "structural_validation": true,
+    "technical_fields_all_yes": true,
+    "unexpected_conversation_reuse": 0,
+    "unexpected_memory_id_reuse": 0,
+    "unsupported_aliases": 0,
+    "unsupported_answers": 0
+  },
+  "failures": [],
+  "governance_pairs": 80,
+  "limitations": [
+    "Automatic checks cannot certify linguistic naturalness or domain realism; human review remains mandatory.",
+    "Visible Test/Holdout candidates are not a secret blind benchmark after repository publication.",
+    "External LongBench component notices remain a separate redistribution audit item."
+  ],
+  "preaudit_remediations": [
+    {
+      "finding": "40 long-context cases contained only 12 short memories",
+      "remediation": "expanded every case to 64 chronological memories and at least 1500 Chinese characters",
+      "severity": "high"
+    },
+    {
+      "finding": "10 semantic-recall distractors repeated the expected memory type",
+      "remediation": "replaced the distractor with a distinct session-buffer fact",
+      "severity": "high"
+    },
+    {
+      "finding": "normalized question-template groups reached 24 cases",
+      "remediation": "introduced category-specific question variants; maximum group is now 4",
+      "severity": "medium"
+    }
+  ],
+  "review_sha256": "d9469d5d842ae6164a267001964a968188896588f14c8f932768783bc0a7d205",
+  "split_counts": {
+    "development": 288,
+    "holdout": 96,
+    "test": 96
+  },
+  "split_sha256": {
+    "development": "c32d229b3253b2e2a7a2167a9c4e061f8ad9f637779d3c1fb798952439a45ea8",
+    "holdout": "b2ac2a367c1f96cd8765dc55c5a35993b99f08ff213e2e48cf54ddc61eecb2c4",
+    "test": "fc1bcf164c713ddceefaf45cfe375f3b696ca834905ce85ef18b237df89b1059"
+  },
+  "status": "passed_pending_human_review",
+  "valid": true
+}

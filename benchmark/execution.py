@@ -73,6 +73,14 @@ def require_frozen_benchmark(path: str | Path) -> dict:
     review_path = benchmark_path.parent / str(review_file)
     if not review_path.exists() or review_sha256 != _sha256_file(review_path):
         raise ValueError("human review no longer matches frozen manifest")
+    signoff_file = manifest.get("review_signoff_file")
+    signoff_sha256 = manifest.get("review_signoff_sha256")
+    if bool(signoff_file) != bool(signoff_sha256):
+        raise ValueError("frozen benchmark manifest has incomplete signoff metadata")
+    if signoff_file:
+        signoff_path = benchmark_path.parent / str(signoff_file)
+        if not signoff_path.exists() or signoff_sha256 != _sha256_file(signoff_path):
+            raise ValueError("human review signoff no longer matches frozen manifest")
     return manifest
 
 
