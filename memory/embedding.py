@@ -13,6 +13,31 @@ class EmbeddingModel(ABC):
         raise NotImplementedError
 
 
+class CachingEmbeddingModel(EmbeddingModel):
+    """Case-local cache backed by one reusable model instance.
+
+    Missing texts are encoded in one batch. Scope this cache to one benchmark
+    case so model weights are reused without retaining a full dataset's source
+    text and vectors in memory.
+    """
+
+    def __init__(self, backend: EmbeddingModel):
+        self.backend = backend
+        self._cache: dict[str, np.ndarray] = {}
+
+    def encode(self, texts: list[str]) -> np.ndarray:
+        if not texts:
+            return np.empty((0, 0), dtype=np.float32)
+        missing = list(dict.fromkeys(text for text in texts if text not in self._cache))
+        if missing:
+            vectors = self.backend.encode(missing)
+            if len(vectors) != len(missing):
+                raise ValueError("embedding backend returned an unexpected row count")
+            for text, vector in zip(missing, vectors):
+                self._cache[text] = np.asarray(vector, dtype=np.float32)
+        return np.stack([self._cache[text] for text in texts]).astype(np.float32, copy=False)
+
+
 class HashEmbeddingModel(EmbeddingModel):
     """Dependency-light dense hashing embedder for development and CI.
 

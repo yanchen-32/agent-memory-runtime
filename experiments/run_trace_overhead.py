@@ -14,13 +14,13 @@ if str(ROOT) not in sys.path:
 
 from agent import OpenAICompatibleClient, RuleBasedClient
 from benchmark import (
+    ReusableEmbeddingFactory,
     collect_environment,
     load_jsonl,
     trace_overhead_summary,
     write_formal_artifacts,
 )
 from benchmark.runner import run_case
-from memory import HashEmbeddingModel, SentenceTransformerEmbedder
 
 
 def parse_args() -> argparse.Namespace:
@@ -35,6 +35,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-url", default=os.getenv("LLM_BASE_URL", "https://api.deepseek.com"))
     parser.add_argument("--api-key", default=os.getenv("LLM_API_KEY", "EMPTY"))
     parser.add_argument("--timeout", type=int, default=60)
+    parser.add_argument("--max-retries", type=int, default=2)
+    parser.add_argument("--retry-backoff-seconds", type=float, default=1.0)
     parser.add_argument("--embedding", choices=("hash", "sentence-transformers"), default="hash")
     parser.add_argument("--embedding-model", default="BAAI/bge-small-zh-v1.5")
     parser.add_argument("--protocol-version", default="1.1")
@@ -56,12 +58,15 @@ def main() -> None:
             api_key=args.api_key,
             timeout=args.timeout,
             thinking="disabled",
+            max_retries=args.max_retries,
+            retry_backoff_seconds=args.retry_backoff_seconds,
         )
 
-    def embedder_factory():
-        if args.embedding == "hash":
-            return HashEmbeddingModel(dim=384)
-        return SentenceTransformerEmbedder(args.embedding_model)
+    embedder_factory = ReusableEmbeddingFactory(
+        args.embedding,
+        args.embedding_model,
+        hash_dim=384,
+    )
 
     rows = []
     sequence = 0
@@ -94,6 +99,8 @@ def main() -> None:
         "top_k": args.top_k,
         "client": args.client,
         "model": args.model if args.client == "openai" else "RuleBasedClient",
+        "max_retries": args.max_retries,
+        "retry_backoff_seconds": args.retry_backoff_seconds,
         "embedding": args.embedding,
         "embedding_model": args.embedding_model if args.embedding == "sentence-transformers" else "HashEmbeddingModel(dim=384)",
         "execution_policy": "trace_condition_interleaved_alternating",

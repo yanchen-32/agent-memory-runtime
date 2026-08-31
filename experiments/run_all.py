@@ -11,10 +11,14 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from agent import OpenAICompatibleClient, RuleBasedClient
-from benchmark import load_jsonl
+from agent import ANSWER_FORMAT_VERSION, OpenAICompatibleClient, RuleBasedClient
+from benchmark import (
+    JsonlRunCheckpoint,
+    ReusableEmbeddingFactory,
+    load_jsonl,
+    sha256_file,
+)
 from benchmark.runner import AGENT_NAMES, run_benchmark
-from memory import HashEmbeddingModel, SentenceTransformerEmbedder
 
 
 def parse_args() -> argparse.Namespace:
@@ -67,6 +71,15 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--api-key", default=os.getenv("LLM_API_KEY", "EMPTY"))
     parser.add_argument("--timeout", type=int, default=60)
+    parser.add_argument("--max-retries", type=int, default=2)
+    parser.add_argument("--retry-backoff-seconds", type=float, default=1.0)
+    parser.add_argument(
+        "--continue-on-error",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Record terminal failures and continue remaining runs.",
+    )
+    parser.add_argument("--resume", action="store_true")
     parser.add_argument("--trace", action="store_true", help="Record full mechanistic trace events.")
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--top-p", type=float, default=1.0)
@@ -116,12 +129,46 @@ def main() -> None:
             top_p=args.top_p,
             max_tokens=args.max_tokens,
             thinking=None if args.thinking == "omit" else args.thinking,
+            max_retries=args.max_retries,
+            retry_backoff_seconds=args.retry_backoff_seconds,
         )
 
-    def embedder_factory():
-        if args.embedding == "hash":
-            return HashEmbeddingModel(dim=384)
-        return SentenceTransformerEmbedder(args.embedding_model)
+    embedder_factory = ReusableEmbeddingFactory(
+        args.embedding,
+        args.embedding_model,
+        hash_dim=384,
+    )
+
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    prefix = args.output_prefix or "unified_v0.2"
+    checkpoint_config = {
+        "benchmark": str(args.benchmark.resolve()),
+        "benchmark_sha256": sha256_file(args.benchmark),
+        "case_ids": [case.case_id for case in cases],
+        "agents": agent_names,
+        "repeats": args.repeats,
+        "top_k": args.top_k,
+        "token_budget": args.token_budget,
+        "client": args.client,
+        "model": args.model if args.client == "openai" else "RuleBasedClient",
+        "base_url": args.base_url if args.client == "openai" else None,
+        "timeout": args.timeout,
+        "max_retries": args.max_retries,
+        "retry_backoff_seconds": args.retry_backoff_seconds,
+        "temperature": args.temperature,
+        "top_p": args.top_p,
+        "max_tokens": args.max_tokens,
+        "thinking": args.thinking,
+        "embedding": args.embedding,
+        "embedding_model": args.embedding_model,
+        "trace": args.trace,
+        "answer_format_version": ANSWER_FORMAT_VERSION,
+    }
+    checkpoint = JsonlRunCheckpoint(
+        args.output_dir / f"{prefix}_checkpoint.jsonl",
+        checkpoint_config,
+    )
+    existing_rows = checkpoint.prepare(resume=args.resume, retry_failed=True)
 
     rows, summary = run_benchmark(
         cases=cases,
@@ -132,9 +179,11 @@ def main() -> None:
         token_budget=args.token_budget,
         repeats=args.repeats,
         trace_enabled=args.trace,
+        existing_rows=existing_rows,
+        on_row=checkpoint.append,
+        continue_on_error=args.continue_on_error,
     )
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
     if args.output_prefix is None:
         detail_path = args.output_dir / "unified_results_v0.2.json"
         summary_path = args.output_dir / "unified_summary_v0.2.json"
@@ -151,15 +200,19 @@ def main() -> None:
     )
 
     print(f"cases: {len(cases)}, agents: {', '.join(agent_names)}, repeats: {args.repeats}")
-    print("agent | accuracy | avg_prompt_tokens | avg_context_tokens | p50_ms | p95_ms | avg_recall@5 | avg_mrr")
+    print("agent | succeeded/failed | accuracy | avg_prompt_tokens | avg_context_tokens | p50_ms | p95_ms | avg_recall@5 | avg_mrr")
+    def display(value, digits=4):
+        return "NA" if value is None else f"{value:.{digits}f}"
+
     for item in summary:
         print(
             f"{item['agent']} | "
-            f"{item['accuracy']:.3f} | "
-            f"{item['avg_prompt_tokens']:.1f} | "
-            f"{item['avg_context_tokens']:.1f} | "
-            f"{item['latency_p50_ms']:.4f} | "
-            f"{item['latency_p95_ms']:.4f} | "
+            f"{item['num_succeeded']}/{item['num_failed']} | "
+            f"{display(item['accuracy'], 3)} | "
+            f"{display(item['avg_prompt_tokens'], 1)} | "
+            f"{display(item['avg_context_tokens'], 1)} | "
+            f"{display(item['latency_p50_ms'])} | "
+            f"{display(item['latency_p95_ms'])} | "
             f"{item['avg_recall@5'] if item['avg_recall@5'] is not None else 'NA'} | "
             f"{item['avg_mrr'] if item['avg_mrr'] is not None else 'NA'}"
         )

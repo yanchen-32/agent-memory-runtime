@@ -48,13 +48,20 @@ class VectorMemoryStore:
         self._records.append(record)
         return record.memory_id
 
-    def add_many(self, texts: list[str], metadata: list[dict] | None = None) -> list[str]:
+    def add_many(
+        self,
+        texts: list[str],
+        metadata: list[dict] | None = None,
+        memory_ids: list[str] | None = None,
+    ) -> list[str]:
         if metadata is not None and len(metadata) != len(texts):
             raise ValueError("metadata length must match texts length")
+        if memory_ids is not None and len(memory_ids) != len(texts):
+            raise ValueError("memory_ids length must match texts length")
         vectors = self.embedder.encode(texts)
         ids: list[str] = []
         for i, (text, vector) in enumerate(zip(texts, vectors)):
-            memory_id = str(uuid4())
+            memory_id = memory_ids[i] if memory_ids is not None else str(uuid4())
             self._records.append(
                 VectorMemoryRecord(
                     memory_id=memory_id,

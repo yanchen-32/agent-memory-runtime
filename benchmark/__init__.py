@@ -1,4 +1,10 @@
 from .loader import BenchmarkCase, load_jsonl
+from .execution import (
+    JsonlRunCheckpoint,
+    ReusableEmbeddingFactory,
+    require_frozen_benchmark,
+    run_row_key,
+)
 from .artifacts import collect_environment, sha256_file, write_formal_artifacts
 from .metrics import (
     answer_metrics,
@@ -17,6 +23,10 @@ __all__ = [
     "BenchmarkCase",
     "collect_environment",
     "load_jsonl",
+    "JsonlRunCheckpoint",
+    "ReusableEmbeddingFactory",
+    "require_frozen_benchmark",
+    "run_row_key",
     "answer_metrics",
     "answer_tokens",
     "estimate_tokens",

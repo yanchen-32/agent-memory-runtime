@@ -126,10 +126,13 @@ def write_formal_artifacts(
         "\n".join(f"{key}: {value}" for key, value in environment.items()) + "\n",
         encoding="utf-8",
     )
+    failure_count = sum(row.get("status") == "failed" for row in rows)
+    run_status = "completed_with_failures" if failure_count else "completed"
     (output_dir / "run.log").write_text(
         f"generated_at={manifest.get('generated_at')}\n"
-        f"status=completed\n"
-        f"rows={len(rows)}\n",
+        f"status={run_status}\n"
+        f"rows={len(rows)}\n"
+        f"failures={failure_count}\n",
         encoding="utf-8",
     )
     (output_dir / "figures").mkdir(exist_ok=True)

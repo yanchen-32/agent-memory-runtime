@@ -3,7 +3,25 @@ from __future__ import annotations
 import json
 import os
 import re
-from urllib import request
+import time
+from urllib import error, request
+
+
+class LLMRequestError(RuntimeError):
+    """Safe, structured terminal error for an LLM HTTP request."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        attempts: int,
+        status_code: int | None = None,
+        retryable: bool = False,
+    ):
+        super().__init__(message)
+        self.attempts = attempts
+        self.status_code = status_code
+        self.retryable = retryable
 
 
 class RuleBasedClient:
@@ -70,6 +88,8 @@ class OpenAICompatibleClient:
         top_p: float = 1.0,
         max_tokens: int | None = None,
         thinking: str | None = "disabled",
+        max_retries: int = 2,
+        retry_backoff_seconds: float = 1.0,
     ):
         self.model = model or os.getenv("LLM_MODEL", "")
         self.base_url = (base_url or os.getenv("LLM_BASE_URL", "http://localhost:8000/v1")).rstrip("/")
@@ -79,11 +99,18 @@ class OpenAICompatibleClient:
         self.top_p = top_p
         self.max_tokens = max_tokens
         self.thinking = thinking
+        self.max_retries = max_retries
+        self.retry_backoff_seconds = retry_backoff_seconds
         self.last_usage: dict = {}
+        self.last_attempts = 0
         if not self.model:
             raise ValueError("LLM model is required. Pass model=... or set LLM_MODEL.")
         if thinking not in {None, "disabled", "enabled"}:
             raise ValueError("thinking must be 'disabled', 'enabled', or None")
+        if max_retries < 0:
+            raise ValueError("max_retries must be >= 0")
+        if retry_backoff_seconds < 0:
+            raise ValueError("retry_backoff_seconds must be >= 0")
 
     def generate(self, prompt: str) -> str:
         body = {
@@ -106,7 +133,31 @@ class OpenAICompatibleClient:
             },
             method="POST",
         )
-        with request.urlopen(req, timeout=self.timeout) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-        self.last_usage = data.get("usage", {})
-        return data["choices"][0]["message"]["content"].strip()
+        retryable_statuses = {408, 409, 429, 500, 502, 503, 504}
+        self.last_usage = {}
+        for attempt in range(1, self.max_retries + 2):
+            self.last_attempts = attempt
+            try:
+                with request.urlopen(req, timeout=self.timeout) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                self.last_usage = data.get("usage", {})
+                return data["choices"][0]["message"]["content"].strip()
+            except error.HTTPError as exc:
+                retryable = exc.code in retryable_statuses
+                if not retryable or attempt > self.max_retries:
+                    raise LLMRequestError(
+                        f"LLM request failed with HTTP {exc.code}",
+                        attempts=attempt,
+                        status_code=exc.code,
+                        retryable=retryable,
+                    ) from exc
+            except (error.URLError, TimeoutError, OSError) as exc:
+                if attempt > self.max_retries:
+                    raise LLMRequestError(
+                        "LLM request failed with a transient network error",
+                        attempts=attempt,
+                        retryable=True,
+                    ) from exc
+            time.sleep(self.retry_backoff_seconds * (2 ** (attempt - 1)))
+
+        raise AssertionError("unreachable retry loop")

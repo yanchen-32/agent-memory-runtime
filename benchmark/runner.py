@@ -132,7 +132,8 @@ def _snapshot(agent_name: str, agent, case: BenchmarkCase) -> dict:
         ranked_ids = _map_runtime_ids(agent, case)
     else:
         ranked_ids = list(getattr(agent, "last_retrieved_ids", []))
-    usage = dict(getattr(getattr(agent, "client", None), "last_usage", {}) or {})
+    client = getattr(agent, "client", None)
+    usage = dict(getattr(client, "last_usage", {}) or {})
     return {
         "prompt": getattr(agent, "last_prompt", ""),
         "context": getattr(agent, "last_context", ""),
@@ -141,6 +142,7 @@ def _snapshot(agent_name: str, agent, case: BenchmarkCase) -> dict:
         "context_latency_ms": float(getattr(agent, "last_context_latency_ms", 0.0)),
         "llm_latency_ms": float(getattr(agent, "last_llm_latency_ms", 0.0)),
         "api_usage": usage,
+        "api_attempts": getattr(client, "last_attempts", None),
     }
 
 
@@ -194,12 +196,14 @@ def run_case(
         retrieval_supported = False
     elif agent_name == "B2":
         store = VectorMemoryStore(embedder_factory())
-        for turn in case.conversation:
-            store.add(
-                str(turn.get("content", "")),
-                metadata={"role": turn.get("role", "user")},
-                memory_id=turn.get("memory_id"),
-            )
+        turns = [
+            turn for turn in case.conversation if str(turn.get("content", "")).strip()
+        ]
+        store.add_many(
+            [str(turn["content"]) for turn in turns],
+            metadata=[{"role": turn.get("role", "user")} for turn in turns],
+            memory_ids=[str(turn.get("memory_id")) for turn in turns],
+        )
         agent = VectorMemoryAgent(client, store, top_k=top_k)
         retrieval_supported = True
     elif agent_name == "B3":
@@ -275,6 +279,7 @@ def run_case(
         estimate_tokens(before["prompt"]) if before is not None else None
     )
     row = {
+        "status": "succeeded",
         "agent": agent_name,
         "case_id": case.case_id,
         "category": case.category,
@@ -316,6 +321,7 @@ def run_case(
         "api_prompt_tokens": after["api_usage"].get("prompt_tokens"),
         "api_completion_tokens": after["api_usage"].get("completion_tokens"),
         "api_total_tokens": after["api_usage"].get("total_tokens"),
+        "api_attempts": after["api_attempts"],
         "retrieval_supported": retrieval_supported,
         "trace_enabled": trace_enabled if agent_name == "Ours" else False,
         "retrieved_memory_ids": after["ranked_ids"],
@@ -467,6 +473,68 @@ def run_case(
     return row
 
 
+def _failure_row(
+    agent_name: str,
+    case: BenchmarkCase,
+    repeat: int,
+    exc: Exception,
+) -> dict:
+    """Create a schema-stable raw row for a terminal case failure."""
+    retrieval_supported = agent_name not in {"B0", "B1"}
+    row = {
+        "status": "failed",
+        "agent": agent_name,
+        "case_id": case.case_id,
+        "category": case.category,
+        "difficulty": case.difficulty,
+        "repeat": repeat,
+        "query": case.query,
+        "query_time": case.memory_query_time,
+        "expected_answer": case.expected_answer,
+        "answer_aliases": case.answer_aliases,
+        "expected_version": case.expected_version,
+        "prediction": "",
+        "correct": None,
+        "exact_match": None,
+        "normalized_match": None,
+        "answer_match": None,
+        "answer_accuracy": None,
+        "answer_precision": None,
+        "answer_recall": None,
+        "answer_f1": None,
+        "normalized_prediction": "",
+        "answer_candidate": "",
+        "normalized_expected": "",
+        "matched_target": case.expected_answer,
+        "prompt_tokens": None,
+        "token_count": None,
+        "context_tokens": None,
+        "setup_latency_ms": None,
+        "latency_ms": None,
+        "end_to_end_latency_ms": None,
+        "memory_latency_ms": None,
+        "context_build_latency_ms": None,
+        "llm_latency_ms": None,
+        "post_latency_ms": None,
+        "ttft_ms": None,
+        "api_prompt_tokens": None,
+        "api_completion_tokens": None,
+        "api_total_tokens": None,
+        "api_attempts": getattr(exc, "attempts", None),
+        "retrieval_supported": retrieval_supported,
+        "retrieved_memory_ids": [],
+        "expected_memory_ids": case.expected_memory_ids,
+        "forbidden_memory_ids": case.forbidden_memory_ids,
+        "error_type": type(exc).__name__,
+        "error_message": str(exc)[:500],
+        "error_status_code": getattr(exc, "status_code", None),
+        "error_attempts": getattr(exc, "attempts", None),
+        "error_retryable": getattr(exc, "retryable", None),
+    }
+    row.update(_empty_retrieval_metrics())
+    return row
+
+
 def _std(values: list[float]) -> float:
     return stdev(values) if len(values) > 1 else 0.0
 
@@ -497,7 +565,10 @@ def summarize(rows: Iterable[dict]) -> list[dict]:
             "agent": agent_name,
             "num_runs": len(agent_rows),
             "num_cases": len({row["case_id"] for row in agent_rows}),
+            "num_succeeded": sum(row.get("status", "succeeded") == "succeeded" for row in agent_rows),
+            "num_failed": sum(row.get("status") == "failed" for row in agent_rows),
         }
+        item["run_success_rate"] = item["num_succeeded"] / len(agent_rows)
         _numeric_summary(item, agent_rows, "correct")
         item["accuracy"] = item["avg_correct"]
         item["accuracy_std"] = item["std_correct"]
@@ -513,12 +584,16 @@ def summarize(rows: Iterable[dict]) -> list[dict]:
         for key in ("prompt_tokens", "token_count", "context_tokens"):
             _numeric_summary(item, agent_rows, key)
 
-        latencies = [float(row["latency_ms"]) for row in agent_rows]
-        item["latency_mean_ms"] = mean(latencies)
-        item["latency_std_ms"] = _std(latencies)
-        item["latency_p50_ms"] = _percentile(latencies, 0.50)
-        item["latency_p95_ms"] = _percentile(latencies, 0.95)
-        item["latency_p99_ms"] = _percentile(latencies, 0.99)
+        latencies = [
+            float(row["latency_ms"])
+            for row in agent_rows
+            if row.get("latency_ms") is not None
+        ]
+        item["latency_mean_ms"] = mean(latencies) if latencies else None
+        item["latency_std_ms"] = _std(latencies) if latencies else None
+        item["latency_p50_ms"] = _percentile(latencies, 0.50) if latencies else None
+        item["latency_p95_ms"] = _percentile(latencies, 0.95) if latencies else None
+        item["latency_p99_ms"] = _percentile(latencies, 0.99) if latencies else None
 
         for key in (
             "end_to_end_latency_ms",
@@ -592,13 +667,20 @@ def run_benchmark(
     consolidation_strategy: str = "fixed",
     consolidation_policy: AdaptiveConsolidationPolicy | None = None,
     trace_enabled: bool = False,
+    existing_rows: Iterable[dict] = (),
+    on_row: Callable[[dict], None] | None = None,
+    continue_on_error: bool = False,
 ) -> tuple[list[dict], list[dict]]:
     if repeats < 1:
         raise ValueError("repeats must be >= 1")
     cases = list(cases)
     agent_names = list(agent_names)
-    rows: list[dict] = []
-    sequence = 0
+    rows: list[dict] = list(existing_rows)
+    completed_keys = {
+        (str(row["case_id"]), str(row["agent"]), int(row.get("repeat", 1)))
+        for row in rows
+    }
+    sequence = max((int(row.get("execution_sequence", 0)) for row in rows), default=0)
     for repeat in range(1, repeats + 1):
         for case_index, case in enumerate(cases):
             # Query-level alternating order limits time-correlated API bias.
@@ -608,21 +690,32 @@ def run_benchmark(
                 else list(reversed(agent_names))
             )
             for order_in_query, agent_name in enumerate(ordered_agents, start=1):
-                row = run_case(
-                    agent_name=agent_name,
-                    case=case,
-                    client_factory=client_factory,
-                    embedder_factory=embedder_factory,
-                    top_k=top_k,
-                    token_budget=token_budget,
-                    repeat=repeat,
-                    consolidation_strategy=consolidation_strategy,
-                    consolidation_policy=consolidation_policy,
-                    trace_enabled=trace_enabled,
-                )
+                key = (case.case_id, agent_name, repeat)
+                if key in completed_keys:
+                    continue
+                try:
+                    row = run_case(
+                        agent_name=agent_name,
+                        case=case,
+                        client_factory=client_factory,
+                        embedder_factory=embedder_factory,
+                        top_k=top_k,
+                        token_budget=token_budget,
+                        repeat=repeat,
+                        consolidation_strategy=consolidation_strategy,
+                        consolidation_policy=consolidation_policy,
+                        trace_enabled=trace_enabled,
+                    )
+                except Exception as exc:
+                    if not continue_on_error:
+                        raise
+                    row = _failure_row(agent_name, case, repeat, exc)
                 sequence += 1
                 row["execution_sequence"] = sequence
                 row["execution_order_in_query"] = order_in_query
                 row["execution_policy"] = "query_interleaved_alternating"
                 rows.append(row)
+                completed_keys.add(key)
+                if on_row is not None:
+                    on_row(row)
     return rows, summarize(rows)

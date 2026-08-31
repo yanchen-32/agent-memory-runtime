@@ -12,19 +12,17 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from agent import OpenAICompatibleClient, RuleBasedClient
+from agent import ANSWER_FORMAT_VERSION, OpenAICompatibleClient, RuleBasedClient
 from benchmark import (
+    JsonlRunCheckpoint,
+    ReusableEmbeddingFactory,
     collect_environment,
     load_jsonl,
     paired_bootstrap_comparison,
     write_formal_artifacts,
 )
 from benchmark.runner import run_benchmark
-from memory import (
-    AdaptiveConsolidationPolicy,
-    HashEmbeddingModel,
-    SentenceTransformerEmbedder,
-)
+from memory import AdaptiveConsolidationPolicy
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,6 +45,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-url", default=os.getenv("LLM_BASE_URL", "https://api.deepseek.com"))
     parser.add_argument("--api-key", default=os.getenv("LLM_API_KEY", "EMPTY"))
     parser.add_argument("--timeout", type=int, default=60)
+    parser.add_argument("--max-retries", type=int, default=2)
+    parser.add_argument("--retry-backoff-seconds", type=float, default=1.0)
+    parser.add_argument("--resume", action="store_true")
     parser.add_argument("--trace", action="store_true", help="Record full mechanistic trace events.")
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--top-p", type=float, default=1.0)
@@ -82,12 +83,15 @@ def main() -> None:
             top_p=args.top_p,
             max_tokens=args.max_tokens,
             thinking=None if args.thinking == "omit" else args.thinking,
+            max_retries=args.max_retries,
+            retry_backoff_seconds=args.retry_backoff_seconds,
         )
 
-    def embedder_factory():
-        if args.embedding == "hash":
-            return HashEmbeddingModel(dim=384)
-        return SentenceTransformerEmbedder(args.embedding_model)
+    embedder_factory = ReusableEmbeddingFactory(
+        args.embedding,
+        args.embedding_model,
+        hash_dim=384,
+    )
 
     policy = AdaptiveConsolidationPolicy(
         trigger_threshold=args.adaptive_trigger_threshold,
@@ -96,6 +100,45 @@ def main() -> None:
         age_horizon_days=args.adaptive_age_horizon_days,
         storage_token_capacity=args.adaptive_storage_token_capacity,
     )
+    checkpoint_config = {
+        "protocol_version": args.protocol_version,
+        "benchmark": str(args.benchmark.resolve()),
+        "repeats": args.repeats,
+        "top_k": args.top_k,
+        "token_budget": args.token_budget,
+        "client": args.client,
+        "model": args.model if args.client == "openai" else "RuleBasedClient",
+        "base_url": args.base_url if args.client == "openai" else None,
+        "timeout": args.timeout,
+        "max_retries": args.max_retries,
+        "retry_backoff_seconds": args.retry_backoff_seconds,
+        "temperature": args.temperature,
+        "top_p": args.top_p,
+        "max_tokens": args.max_tokens,
+        "thinking": args.thinking,
+        "embedding": args.embedding,
+        "embedding_model": args.embedding_model,
+        "policy_version": policy.version,
+        "trigger_threshold": policy.trigger_threshold,
+        "conflict_threshold": policy.conflict_threshold,
+        "target_cluster_size": policy.target_cluster_size,
+        "age_horizon_days": policy.age_horizon_days,
+        "storage_token_capacity": policy.storage_token_capacity,
+        "trigger_weights": policy.trigger_weights,
+        "granularity_weights": policy.granularity_weights,
+        "trace": args.trace,
+        "answer_format_version": ANSWER_FORMAT_VERSION,
+    }
+    fixed_checkpoint = JsonlRunCheckpoint(
+        args.output_dir / "fixed_checkpoint.jsonl",
+        {**checkpoint_config, "strategy": "fixed"},
+    )
+    adaptive_checkpoint = JsonlRunCheckpoint(
+        args.output_dir / "adaptive_checkpoint.jsonl",
+        {**checkpoint_config, "strategy": "adaptive"},
+    )
+    fixed_existing = fixed_checkpoint.prepare(resume=args.resume, retry_failed=True)
+    adaptive_existing = adaptive_checkpoint.prepare(resume=args.resume, retry_failed=True)
     fixed_rows, fixed_summary = run_benchmark(
         cases,
         ("Ours",),
@@ -106,6 +149,9 @@ def main() -> None:
         repeats=args.repeats,
         consolidation_strategy="fixed",
         trace_enabled=args.trace,
+        existing_rows=fixed_existing,
+        on_row=fixed_checkpoint.append,
+        continue_on_error=True,
     )
     adaptive_rows, adaptive_summary = run_benchmark(
         cases,
@@ -118,6 +164,9 @@ def main() -> None:
         consolidation_strategy="adaptive",
         consolidation_policy=policy,
         trace_enabled=args.trace,
+        existing_rows=adaptive_existing,
+        on_row=adaptive_checkpoint.append,
+        continue_on_error=True,
     )
     comparison_rows = [
         {**row, "agent": "Fixed"} for row in fixed_rows
@@ -130,6 +179,11 @@ def main() -> None:
         treatment="Adaptive",
         samples=args.bootstrap_samples,
     )
+    failure_count = sum(row.get("status") == "failed" for row in comparison_rows)
+    comparison["formal_comparison_valid"] = failure_count == 0
+    comparison["failure_count"] = failure_count
+    if failure_count:
+        comparison["invalid_reason"] = "terminal run failures present"
 
     generated_at = datetime.now(timezone.utc).isoformat()
     environment = collect_environment(ROOT, args.benchmark)
@@ -141,6 +195,8 @@ def main() -> None:
         "client": args.client,
         "model": args.model if args.client == "openai" else "RuleBasedClient",
         "base_url": args.base_url if args.client == "openai" else None,
+        "max_retries": args.max_retries,
+        "retry_backoff_seconds": args.retry_backoff_seconds,
         "temperature": args.temperature,
         "top_p": args.top_p,
         "max_tokens": args.max_tokens,
@@ -156,6 +212,7 @@ def main() -> None:
         "adaptive_trigger_weights": policy.trigger_weights,
         "adaptive_granularity_weights": policy.granularity_weights,
         "trace_enabled": args.trace,
+        "answer_format_version": ANSWER_FORMAT_VERSION,
     }
     payload = {
         "experiment": "E5",

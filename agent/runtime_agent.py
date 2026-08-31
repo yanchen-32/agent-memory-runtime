@@ -42,6 +42,16 @@ class MemoryRuntimeAgent(Agent):
     ):
         self.user_id = user_id
         self.session_id = session_id
+        contents = [
+            str(message.get("content", "")).strip()
+            for message in messages
+            if message.get("role", "user") in {"user", "tool"}
+            and str(message.get("content", "")).strip()
+        ]
+        if contents:
+            # One batch primes the case-local embedding cache. Governance still
+            # processes writes sequentially, preserving version semantics.
+            self.runtime.embedder.encode(contents)
         outputs = []
         for message in messages:
             write_time = coerce_datetime(

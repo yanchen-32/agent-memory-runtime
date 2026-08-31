@@ -22,6 +22,11 @@
 temperature、top_p、thinking 模式、最大输出长度、timeout 和 retry 设置。
 B2/B3 不得使用 Ours 的治理能力。失败和超时必须留在原始记录中。
 
+正式运行采用逐行追加 Checkpoint；恢复时只允许配置指纹和 Benchmark SHA256
+完全一致，并跳过已经完成的 `(Case ID, Agent, Repeat)`。暂态 HTTP 错误允许按
+冻结的指数退避策略重试；401 等认证错误不重试。最终失败保留为失败行，不能
+静默删除、当作零分混入配对统计，或在失败后临时更换某个 Agent 的配置。
+
 正式生成模型第一组配置冻结为 non-thinking、temperature=0。模型或
 Embedding 变更必须作为新实验配置完整重跑所有对照组。API Key 只允许从
 环境变量或命令行注入，不得写入结果、日志、代码或 Git。

@@ -12,16 +12,19 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from agent import OpenAICompatibleClient, RuleBasedClient
+from agent import ANSWER_FORMAT_VERSION, OpenAICompatibleClient, RuleBasedClient
 from benchmark import (
+    JsonlRunCheckpoint,
+    ReusableEmbeddingFactory,
     collect_environment,
     load_jsonl,
     paired_bootstrap_comparison,
     paired_latency_reduction,
+    require_frozen_benchmark,
+    sha256_file,
     write_formal_artifacts,
 )
 from benchmark.runner import AGENT_NAMES, run_benchmark, summarize
-from memory import HashEmbeddingModel, SentenceTransformerEmbedder
 
 
 E1_CATEGORIES = {
@@ -55,6 +58,19 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--api-key", default=os.getenv("LLM_API_KEY", "EMPTY"))
     parser.add_argument("--timeout", type=int, default=60)
+    parser.add_argument("--max-retries", type=int, default=2)
+    parser.add_argument("--retry-backoff-seconds", type=float, default=1.0)
+    parser.add_argument(
+        "--continue-on-error",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
+    parser.add_argument("--resume", action="store_true")
+    parser.add_argument(
+        "--allow-unreviewed-benchmark",
+        action="store_true",
+        help="Development pilot only; formal claims are forbidden.",
+    )
     parser.add_argument("--trace", action="store_true", help="Record full mechanistic trace events.")
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--top-p", type=float, default=1.0)
@@ -80,6 +96,8 @@ def main() -> None:
     args = parse_args()
     if args.repeats < 3:
         raise ValueError("Formal E1/E2 experiments require --repeats >= 3")
+    if not args.allow_unreviewed_benchmark:
+        require_frozen_benchmark(args.benchmark)
 
     agent_names = [name.strip() for name in args.agents.split(",") if name.strip()]
     unknown = sorted(set(agent_names) - set(AGENT_NAMES))
@@ -100,12 +118,46 @@ def main() -> None:
             top_p=args.top_p,
             max_tokens=args.max_tokens,
             thinking=None if args.thinking == "omit" else args.thinking,
+            max_retries=args.max_retries,
+            retry_backoff_seconds=args.retry_backoff_seconds,
         )
 
-    def embedder_factory():
-        if args.embedding == "hash":
-            return HashEmbeddingModel(dim=384)
-        return SentenceTransformerEmbedder(args.embedding_model)
+    embedder_factory = ReusableEmbeddingFactory(
+        args.embedding,
+        args.embedding_model,
+        hash_dim=384,
+    )
+
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    checkpoint_config = {
+        "protocol_version": args.protocol_version,
+        "benchmark": str(args.benchmark.resolve()),
+        "benchmark_sha256": sha256_file(args.benchmark),
+        "agents": agent_names,
+        "repeats": args.repeats,
+        "top_k": args.top_k,
+        "token_budget": args.token_budget,
+        "client": args.client,
+        "model": args.model if args.client == "openai" else "RuleBasedClient",
+        "base_url": args.base_url if args.client == "openai" else None,
+        "timeout": args.timeout,
+        "max_retries": args.max_retries,
+        "retry_backoff_seconds": args.retry_backoff_seconds,
+        "temperature": args.temperature,
+        "top_p": args.top_p,
+        "max_tokens": args.max_tokens,
+        "thinking": args.thinking,
+        "embedding": args.embedding,
+        "embedding_model": args.embedding_model,
+        "trace": args.trace,
+        "answer_format_version": ANSWER_FORMAT_VERSION,
+        "benchmark_review_enforced": not args.allow_unreviewed_benchmark,
+    }
+    checkpoint = JsonlRunCheckpoint(
+        args.output_dir / "run_checkpoint.jsonl",
+        checkpoint_config,
+    )
+    existing_rows = checkpoint.prepare(resume=args.resume, retry_failed=True)
 
     rows, _ = run_benchmark(
         cases=cases,
@@ -116,12 +168,14 @@ def main() -> None:
         token_budget=args.token_budget,
         repeats=args.repeats,
         trace_enabled=args.trace,
+        existing_rows=existing_rows,
+        on_row=checkpoint.append,
+        continue_on_error=args.continue_on_error,
     )
 
     e1_rows = [row for row in rows if row["category"] in E1_CATEGORIES]
     e2_rows = [row for row in rows if row["category"] in E2_CATEGORIES]
     generated_at = datetime.now(timezone.utc).isoformat()
-    args.output_dir.mkdir(parents=True, exist_ok=True)
     environment = collect_environment(ROOT, args.benchmark)
 
     experiment_summaries = {
@@ -138,6 +192,14 @@ def main() -> None:
         "E1_e2e_latency_B1_vs_Ours": paired_latency_reduction(e1_rows),
         "E2_e2e_latency_B1_vs_Ours": paired_latency_reduction(e2_rows),
     }
+    for experiment, experiment_rows in (("E1", e1_rows), ("E2", e2_rows)):
+        failure_count = sum(row.get("status") == "failed" for row in experiment_rows)
+        for suffix in ("answer_f1_B1_vs_Ours", "e2e_latency_B1_vs_Ours"):
+            comparison = comparisons[f"{experiment}_{suffix}"]
+            comparison["formal_comparison_valid"] = failure_count == 0
+            comparison["failure_count"] = failure_count
+            if failure_count:
+                comparison["invalid_reason"] = "terminal run failures present"
     safe_config = {
         "protocol_version": args.protocol_version,
         "benchmark": str(args.benchmark.resolve()),
@@ -149,6 +211,9 @@ def main() -> None:
         "model": args.model if args.client == "openai" else "RuleBasedClient",
         "base_url": args.base_url if args.client == "openai" else None,
         "timeout": args.timeout,
+        "max_retries": args.max_retries,
+        "retry_backoff_seconds": args.retry_backoff_seconds,
+        "continue_on_error": args.continue_on_error,
         "temperature": args.temperature,
         "top_p": args.top_p,
         "max_tokens": args.max_tokens,
@@ -162,17 +227,24 @@ def main() -> None:
         "trace_enabled": args.trace,
         "bootstrap_samples": args.bootstrap_samples,
         "bootstrap_seed": 202601,
+        "answer_format_version": ANSWER_FORMAT_VERSION,
+        "benchmark_review_enforced": not args.allow_unreviewed_benchmark,
     }
 
+    benchmark_label = (
+        f"v1.0_{args.benchmark.stem}"
+        if args.benchmark.parent.name == "v1.0"
+        else args.benchmark.stem.removeprefix("benchmark_")
+    )
     outputs = [
         (
-            "e1_long_term_accuracy_v0.2.json",
+            f"e1_long_term_accuracy_{benchmark_label}.json",
             "E1",
             E1_CATEGORIES,
             e1_rows,
         ),
         (
-            "e2_update_conflict_v0.2.json",
+            f"e2_update_conflict_{benchmark_label}.json",
             "E2",
             E2_CATEGORIES,
             e2_rows,
@@ -229,12 +301,17 @@ def main() -> None:
     for label, experiment_rows in (("E1", e1_rows), ("E2", e2_rows)):
         print(f"{label} summary:")
         for item in summarize(experiment_rows):
+            latency_mean = item["latency_mean_ms"]
+            latency_p50 = item["latency_p50_ms"]
+            latency_p95 = item["latency_p95_ms"]
             print(
-                f"  {item['agent']}: accuracy={item['accuracy']:.3f} "
-                f"+/- {item['accuracy_std']:.3f}, "
-                f"latency_mean={item['latency_mean_ms']:.4f} ms, "
-                f"p50={item['latency_p50_ms']:.4f} ms, "
-                f"p95={item['latency_p95_ms']:.4f} ms"
+                f"  {item['agent']}: succeeded={item['num_succeeded']} "
+                f"failed={item['num_failed']}, "
+                f"accuracy={item['accuracy'] if item['accuracy'] is not None else 'NA'} "
+                f"+/- {item['accuracy_std'] if item['accuracy_std'] is not None else 'NA'}, "
+                f"latency_mean={latency_mean if latency_mean is not None else 'NA'} ms, "
+                f"p50={latency_p50 if latency_p50 is not None else 'NA'} ms, "
+                f"p95={latency_p95 if latency_p95 is not None else 'NA'} ms"
             )
 
 

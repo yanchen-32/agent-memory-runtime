@@ -34,11 +34,14 @@ class FullHistoryAgent(Agent):
     ) -> str:
         context_started = time.perf_counter()
         conversation = conversation or []
-        lines = [
-            f"MEMORY[{i}] {turn.get('content', '')}"
-            for i, turn in enumerate(conversation, start=1)
-            if str(turn.get("content", "")).strip()
-        ]
+        lines = []
+        for index, turn in enumerate(conversation, start=1):
+            content = str(turn.get("content", "")).strip()
+            if not content:
+                continue
+            timestamp = turn.get("valid_from") or turn.get("created_at")
+            time_prefix = f" TIME[{timestamp}]" if timestamp else ""
+            lines.append(f"MEMORY[{index}]{time_prefix} {content}")
         header = (
             "You are a full-history baseline agent.\n"
             "Use the conversation history below to answer the question.\n"

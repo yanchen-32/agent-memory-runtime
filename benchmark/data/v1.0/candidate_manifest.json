@@ -1,0 +1,51 @@
+{
+  "benchmark_version": "1.0-candidate",
+  "status": "pending_human_review",
+  "formal_results_allowed": false,
+  "total_cases": 36,
+  "governance_pairs": 6,
+  "split_policy": "scenario_family_disjoint",
+  "splits": {
+    "development": {
+      "file": "development.jsonl",
+      "sha256": "6bdfb653ec170343bc4f7ac8983fa541c5717eab26c1bdbc495cfc7426693b34",
+      "case_count": 12,
+      "scenario_families": [
+        "dev_deployment_governance",
+        "dev_research_runtime"
+      ]
+    },
+    "test": {
+      "file": "test.jsonl",
+      "sha256": "4580c3968475dfe3726767e6a3859d21a7d3f9861bfbbf71ab050aaf76ceddf8",
+      "case_count": 12,
+      "scenario_families": [
+        "test_quality_inspection",
+        "test_supply_chain"
+      ]
+    },
+    "holdout": {
+      "file": "holdout.jsonl",
+      "sha256": "c8bac78e2a2c47b7aaef4009a786ef48af779a45239c1959b92801714b697733",
+      "case_count": 12,
+      "scenario_families": [
+        "holdout_energy_management",
+        "holdout_production_line"
+      ]
+    }
+  },
+  "review": {
+    "file": "review_checklist.csv",
+    "required_fields": [
+      "question_clear",
+      "answer_correct",
+      "evidence_ids_correct",
+      "forbidden_ids_correct",
+      "timestamps_correct",
+      "aliases_checked"
+    ],
+    "required_value": "yes",
+    "decision_required": "approved",
+    "reviewer_required": true
+  }
+}

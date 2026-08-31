@@ -6,6 +6,7 @@ import time
 from typing import Protocol
 
 
+ANSWER_FORMAT_VERSION = "shortest-answer-v1"
 ANSWER_FORMAT_INSTRUCTION = (
     "Reply with only the shortest answer, or UNKNOWN if unsupported.\n"
 )

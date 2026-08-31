@@ -1,5 +1,10 @@
 # B2 baseline exports (kept frozen for baseline comparability).
-from .embedding import EmbeddingModel, HashEmbeddingModel, SentenceTransformerEmbedder
+from .embedding import (
+    CachingEmbeddingModel,
+    EmbeddingModel,
+    HashEmbeddingModel,
+    SentenceTransformerEmbedder,
+)
 from .vector_store import MemoryHit, VectorMemoryRecord, VectorMemoryStore
 
 # Memory Runtime V1 exports.
@@ -43,7 +48,7 @@ from .service import MemoryReaderV1, MemoryWriterV1
 from .storage import InMemoryMemoryStore, MemoryStore, SQLiteMemoryStore
 
 __all__ = [
-    "EmbeddingModel", "HashEmbeddingModel", "SentenceTransformerEmbedder",
+    "CachingEmbeddingModel", "EmbeddingModel", "HashEmbeddingModel", "SentenceTransformerEmbedder",
     "MemoryHit", "VectorMemoryRecord", "VectorMemoryStore",
     "LLMMemoryClassifier", "RuleMemoryClassifier",
     "BudgetSelection", "ContextBudgetManager",

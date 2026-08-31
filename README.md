@@ -21,7 +21,7 @@ pytest -q
 python experiments/run_b0_no_memory.py
 python experiments/run_b2_vector_memory.py
 python experiments/run_all.py
-python experiments/run_e1_e2.py --repeats 3
+python experiments/run_e1_e2.py --repeats 3 --allow-unreviewed-benchmark
 ~~~
 
 The unified runner evaluates B0, B1, B2 and Ours with the same answer, retrieval, token and latency fields:
@@ -67,6 +67,18 @@ python experiments/run_all.py \
 
 The command reads the API key from `LLM_API_KEY`; it does not store the key in
 the result files. Add `B2,B3` only after the one-call smoke test succeeds.
+
+Long runs write an append-only checkpoint after every `(case, agent, repeat)`.
+Use the exact same configuration and add `--resume` after an interruption.
+Transient HTTP failures are retried with exponential backoff; terminal failures
+are retained as `status=failed` rows without storing response bodies or secrets.
+The Sentence Transformer weights are loaded once per process, while each case
+uses an isolated embedding cache and batched document encoding.
+
+Benchmark v1.0 candidate split validation and human-review freeze are documented
+in `benchmark/data/v1.0/README.md`. Formal `run_e1_e2.py` runs require a matching
+`frozen_manifest.json`; use `--allow-unreviewed-benchmark` only for Development
+pilots whose outputs cannot support formal claims.
 
 The default implementation is offline and deterministic. RuleBasedClient and
 HashEmbeddingModel are smoke-test tools only. Formal results must use the same
@@ -153,10 +165,19 @@ MemoryRuntimeV1.read accepts query_time. Omitting query_time reads the current a
 
 The runtime also exposes ContextBudgetManager through select_context. Selection combines retrieval relevance, memory importance, diversity, redundancy and token efficiency. The budget applies to the complete prompt represented by prefix, selected context and suffix.
 
-Run the formal experiments with three repeats:
+Run an offline, non-formal infrastructure smoke with three repeats:
 
 ~~~bash
-python experiments/run_e1_e2.py
+python experiments/run_e1_e2.py --allow-unreviewed-benchmark
+~~~
+
+After human review creates `benchmark/data/v1.0/frozen_manifest.json`, run the
+frozen Test split without the override:
+
+~~~bash
+python experiments/run_e1_e2.py \
+  --benchmark benchmark/data/v1.0/test.jsonl \
+  --repeats 3
 ~~~
 
 The E1 output covers long-term recall, budget, multi-hop and forgetting. The E2
