@@ -85,7 +85,8 @@ latency-reduction target remains unmet.
 | Ours historical retrieval | 144 / 144 | Pass |
 | Ours forbidden retrieval on Update/Conflict/Temporal | 0 / 288 rows | Pass |
 | Ours forbidden retrieval including Forgetting | 0 / 360 rows | Pass |
-| Ours defined Recall@1 / Recall@5 / MRR | 100% / 100% / 100% | Pass |
+| Ours defined Recall@1 / Recall@5 / MRR | 95% / 100% / 100% | Pass |
+| Ours complete-chain hit | 100% | Pass |
 
 B2 and B3 intentionally remain without version filtering and retrieved a
 forbidden version on every defined governance run. Their answer accuracy is
