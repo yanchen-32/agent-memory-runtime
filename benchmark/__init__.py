@@ -7,6 +7,8 @@ from .execution import (
 )
 from .artifacts import collect_environment, sha256_file, write_formal_artifacts
 from .metrics import (
+    LEGACY_ANSWER_SCORER_VERSION,
+    QUANTITY_ANSWER_SCORER_VERSION,
     answer_metrics,
     answer_tokens,
     estimate_tokens,
@@ -27,6 +29,8 @@ __all__ = [
     "ReusableEmbeddingFactory",
     "require_frozen_benchmark",
     "run_row_key",
+    "LEGACY_ANSWER_SCORER_VERSION",
+    "QUANTITY_ANSWER_SCORER_VERSION",
     "answer_metrics",
     "answer_tokens",
     "estimate_tokens",

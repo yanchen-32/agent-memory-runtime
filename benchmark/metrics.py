@@ -10,6 +10,9 @@ _ANSWER_PREFIX_RE = re.compile(
     flags=re.IGNORECASE,
 )
 _TOKEN_RE = re.compile(r"[a-z0-9_]+|[\u4e00-\u9fff]", flags=re.IGNORECASE)
+LEGACY_ANSWER_SCORER_VERSION = "legacy-answer-v1"
+QUANTITY_ANSWER_SCORER_VERSION = "quantity-semantic-v1"
+_TERMINAL_PUNCTUATION_RE = re.compile(r"[。！？.!?]+$")
 
 
 def estimate_tokens(text: str) -> int:
@@ -52,10 +55,84 @@ def _answer_candidate(text: str) -> str:
     return normalize_answer(candidate)
 
 
+def _compact_answer(text: str, *, strip_prefix: bool) -> str:
+    """Normalize spacing and terminal punctuation without deleting semantics."""
+    normalized = unicodedata.normalize("NFKC", str(text)).strip().lower()
+    if strip_prefix:
+        normalized = _ANSWER_PREFIX_RE.sub("", normalized)
+    normalized = _TERMINAL_PUNCTUATION_RE.sub("", normalized.strip())
+    return re.sub(r"\s+", "", normalized)
+
+
+def _quantity_semantic_match(
+    prediction: str,
+    expected_answer: str,
+    answer_spec: dict[str, object],
+) -> bool:
+    """Match a benchmark-declared scalar quantity using full-response forms."""
+    scorer_version = answer_spec.get("scorer_version")
+    if scorer_version != QUANTITY_ANSWER_SCORER_VERSION:
+        raise ValueError(
+            "quantity answer_spec requires scorer_version="
+            f"{QUANTITY_ANSWER_SCORER_VERSION!r}"
+        )
+    canonical_value = str(answer_spec.get("canonical_value", expected_answer))
+    if normalize_answer(canonical_value) != normalize_answer(expected_answer):
+        raise ValueError("answer_spec canonical_value must match expected_answer")
+
+    unit_policy = str(answer_spec.get("unit_policy", "optional"))
+    if unit_policy not in {"optional", "required", "forbidden"}:
+        raise ValueError("answer_spec unit_policy must be optional, required, or forbidden")
+
+    raw_units = answer_spec.get("units", [])
+    if not isinstance(raw_units, list) or not all(
+        isinstance(unit, str) and unit.strip() for unit in raw_units
+    ):
+        raise ValueError("answer_spec units must be a list of non-empty strings")
+    units = {_compact_answer(unit, strip_prefix=False) for unit in raw_units}
+    if unit_policy in {"optional", "required"} and not units:
+        raise ValueError("answer_spec units cannot be empty when a unit is accepted")
+
+    raw_value_aliases = answer_spec.get("value_aliases", [])
+    if not isinstance(raw_value_aliases, list) or not all(
+        isinstance(alias, str) and alias.strip() for alias in raw_value_aliases
+    ):
+        raise ValueError("answer_spec value_aliases must be a list of non-empty strings")
+    values = {
+        _compact_answer(canonical_value, strip_prefix=False),
+        *(
+            _compact_answer(alias, strip_prefix=False)
+            for alias in raw_value_aliases
+        ),
+    }
+
+    accepted = set(values) if unit_policy != "required" else set()
+    if unit_policy != "forbidden":
+        accepted.update(value + unit for value in values for unit in units)
+    candidate = _compact_answer(prediction, strip_prefix=True)
+    return candidate in accepted
+
+
+def _answer_format_compliance(
+    prediction: str,
+    expected_answer: str,
+    answer_spec: dict[str, object],
+) -> bool:
+    """Check the separately declared shortest-answer presentation contract."""
+    output_format = str(answer_spec.get("output_format", "bare_value"))
+    if output_format != "bare_value":
+        raise ValueError("only output_format='bare_value' is currently supported")
+    return _compact_answer(prediction, strip_prefix=False) == _compact_answer(
+        expected_answer,
+        strip_prefix=False,
+    )
+
+
 def answer_metrics(
     prediction: str,
     expected_answer: str,
     answer_aliases: list[str] | tuple[str, ...] | None = None,
+    answer_spec: dict[str, object] | None = None,
 ) -> dict[str, object]:
     """Return raw/normalized matches and token-overlap Answer F1.
 
@@ -88,12 +165,39 @@ def answer_metrics(
 
     normalized_match = normalized_prediction in normalized_targets
     answer_candidate = _answer_candidate(prediction)
-    answer_match = answer_candidate in normalized_targets
+    strict_answer_match = answer_candidate in normalized_targets
+    if answer_spec is None:
+        scorer_version = LEGACY_ANSWER_SCORER_VERSION
+        semantic_answer_match = strict_answer_match
+        format_compliance: bool | None = None
+    else:
+        answer_type = answer_spec.get("type")
+        if answer_type != "quantity":
+            raise ValueError(f"unsupported answer_spec type: {answer_type!r}")
+        scorer_version = str(answer_spec.get("scorer_version", ""))
+        semantic_answer_match = _quantity_semantic_match(
+            prediction,
+            expected_answer,
+            answer_spec,
+        )
+        format_compliance = _answer_format_compliance(
+            prediction,
+            expected_answer,
+            answer_spec,
+        )
     return {
         "exact_match": str(prediction) == str(expected_answer),
         "normalized_match": normalized_match,
-        "answer_match": answer_match,
-        "answer_accuracy": int(answer_match),
+        "strict_answer_match": strict_answer_match,
+        "strict_answer_accuracy": int(strict_answer_match),
+        "semantic_answer_match": semantic_answer_match,
+        "semantic_answer_accuracy": int(semantic_answer_match),
+        "answer_format_compliance": (
+            int(format_compliance) if format_compliance is not None else None
+        ),
+        "answer_scorer_version": scorer_version,
+        "answer_match": semantic_answer_match,
+        "answer_accuracy": int(semantic_answer_match),
         "answer_precision": best_precision,
         "answer_recall": best_recall,
         "answer_f1": best_f1,

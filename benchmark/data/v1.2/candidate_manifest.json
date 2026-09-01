@@ -1,0 +1,49 @@
+{
+  "benchmark_version": "1.2-candidate",
+  "budget_answer_spec_count": 40,
+  "deep_audit": {
+    "file": "deep_audit.json",
+    "sha256": "ec604094337c8539ab78e65af9dceda3009db091c6e8bd81b323d91268568d57",
+    "status": "passed_pending_human_review",
+    "valid": true,
+    "version": "v1.2.0"
+  },
+  "generator_version": "v1.2.0",
+  "lineage_file": "lineage_manifest.json",
+  "lineage_sha256": "618f61d030f17fecb63bf14138e7578bb6e19774e60443830b50dfa948159294",
+  "review_file": "review_checklist.csv",
+  "review_sha256": "dcda9c30c7b32e870ab8fb98795bc4487509f497a31c2fdfde2ee5de56ab7bf4",
+  "review_signoff": {
+    "file": "review_signoff.json",
+    "scope": "all_development_test_holdout_scoring_candidates",
+    "unsigned_template_sha256": "b52594267c6f8beefa301d6ad5ad1aa81ec1abbb2501370c4b0413131251e499"
+  },
+  "seed": 20260831,
+  "signoff_file": "review_signoff.json",
+  "splits": {
+    "development": {
+      "case_count": 288,
+      "file": "development.jsonl",
+      "sha256": "46d856387fec4d77ffc99841407f73afe6dc820503e5b361bf262349e91775c6"
+    },
+    "holdout": {
+      "case_count": 96,
+      "file": "holdout.jsonl",
+      "sha256": "9aeeacd8528d587ab348001a188093819eabb56b178d3a4e8e0ab5086d178144"
+    },
+    "test": {
+      "case_count": 96,
+      "file": "test.jsonl",
+      "sha256": "d20b522e90af47ce61e457cfaca2521438285df9d477ce16d97e89d0a6b9e9ea"
+    }
+  },
+  "status": "pending_human_review",
+  "technical_prereview": {
+    "checked_cases": 480,
+    "file": "ai_prereview.md",
+    "sha256": "dc994d711dd021a48b962d771d1d27228c7650724c8d8256081cffdba003855d",
+    "technical_failures": 0,
+    "version": "v1.2.0"
+  },
+  "total_case_count": 480
+}

@@ -1,0 +1,26 @@
+{
+  "audit_version": "v1.2.0",
+  "benchmark_version": "1.2-candidate",
+  "budget_answer_spec_count": 40,
+  "case_count": 480,
+  "failures": [],
+  "human_signatures_present": 0,
+  "parent_equivalent_case_count": 480,
+  "parent_split_sha256": {
+    "development": "c32d229b3253b2e2a7a2167a9c4e061f8ad9f637779d3c1fb798952439a45ea8",
+    "holdout": "b2ac2a367c1f96cd8765dc55c5a35993b99f08ff213e2e48cf54ddc61eecb2c4",
+    "test": "fc1bcf164c713ddceefaf45cfe375f3b696ca834905ce85ef18b237df89b1059"
+  },
+  "review_sha256": "dcda9c30c7b32e870ab8fb98795bc4487509f497a31c2fdfde2ee5de56ab7bf4",
+  "scoring_contract": "quantity-semantic-v1",
+  "split_sha256": {
+    "development": "46d856387fec4d77ffc99841407f73afe6dc820503e5b361bf262349e91775c6",
+    "holdout": "9aeeacd8528d587ab348001a188093819eabb56b178d3a4e8e0ab5086d178144",
+    "test": "d20b522e90af47ce61e457cfaca2521438285df9d477ce16d97e89d0a6b9e9ea"
+  },
+  "status": "passed_pending_human_review",
+  "technical_fields_all_yes": true,
+  "technical_review_rows": 480,
+  "unauthorized_change_count": 0,
+  "valid": true
+}

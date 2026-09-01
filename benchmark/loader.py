@@ -24,6 +24,7 @@ class BenchmarkCase:
     memory_metadata: dict[str, dict[str, Any]] = field(default_factory=dict)
     forbidden_memory_ids: list[str] = field(default_factory=list)
     metadata: dict[str, Any] = field(default_factory=dict)
+    answer_spec: dict[str, Any] | None = None
 
 
 def load_jsonl(path: str | Path) -> list[BenchmarkCase]:

@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from agent import RuleBasedClient
-from benchmark import load_jsonl
+from benchmark import BenchmarkCase, QUANTITY_ANSWER_SCORER_VERSION, load_jsonl
 from benchmark.runner import run_case
 from memory import HashEmbeddingModel
 
@@ -18,6 +18,13 @@ class TemporalContractClient:
         assert "SQLite" in prompt
         assert "openGauss" not in prompt
         return "SQLite"
+
+
+class QuantityUnitClient:
+    last_usage: dict = {}
+
+    def generate(self, prompt: str) -> str:
+        return "5条。"
 
 
 def test_runner_emits_historical_and_budget_fields():
@@ -74,3 +81,39 @@ def test_v1_80_token_budget_does_not_receive_historical_prompt_overhead():
         )
         assert row["budget_satisfied"] is True
         assert row["budget_after_prompt_tokens"] <= 80
+
+
+def test_runner_reports_budget_semantics_format_and_joint_success_separately():
+    case = BenchmarkCase(
+        case_id="typed_budget_001",
+        category="budget",
+        conversation=[],
+        query="每次取回多少条候选记忆？",
+        expected_memory_ids=[],
+        expected_answer="5",
+        expected_version="",
+        query_time="2026-09-01T00:00:00+08:00",
+        difficulty="easy",
+        token_budget=80,
+        answer_spec={
+            "type": "quantity",
+            "canonical_value": "5",
+            "units": ["条"],
+            "unit_policy": "optional",
+            "output_format": "bare_value",
+            "scorer_version": QUANTITY_ANSWER_SCORER_VERSION,
+        },
+    )
+
+    row = run_case(
+        "B0",
+        case,
+        QuantityUnitClient,
+        lambda: HashEmbeddingModel(dim=64),
+    )
+
+    assert row["strict_answer_accuracy"] == 0
+    assert row["semantic_answer_accuracy"] == 1
+    assert row["answer_format_compliance"] == 0
+    assert row["budget_satisfied"] is True
+    assert row["budget_task_success"] == 1

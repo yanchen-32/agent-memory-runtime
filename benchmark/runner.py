@@ -287,6 +287,17 @@ def run_case(
         prediction_after,
         case.expected_answer,
         case.answer_aliases,
+        case.answer_spec,
+    )
+    before_answer = (
+        answer_metrics(
+            prediction_before,
+            case.expected_answer,
+            case.answer_aliases,
+            case.answer_spec,
+        )
+        if prediction_before is not None
+        else None
     )
     answer_correct = int(after_answer["answer_accuracy"])
     historical_retrieval_correct = (
@@ -309,11 +320,18 @@ def run_case(
         "query_time": case.memory_query_time,
         "expected_answer": case.expected_answer,
         "answer_aliases": case.answer_aliases,
+        "answer_spec": case.answer_spec,
+        "answer_scorer_version": after_answer["answer_scorer_version"],
         "expected_version": case.expected_version,
         "prediction": prediction_after,
         "correct": answer_correct,
         "exact_match": int(after_answer["exact_match"]),
         "normalized_match": int(after_answer["normalized_match"]),
+        "strict_answer_match": int(after_answer["strict_answer_match"]),
+        "strict_answer_accuracy": int(after_answer["strict_answer_accuracy"]),
+        "semantic_answer_match": int(after_answer["semantic_answer_match"]),
+        "semantic_answer_accuracy": int(after_answer["semantic_answer_accuracy"]),
+        "answer_format_compliance": after_answer["answer_format_compliance"],
         "answer_match": int(after_answer["answer_match"]),
         "answer_accuracy": answer_correct,
         "answer_precision": after_answer["answer_precision"],
@@ -374,23 +392,20 @@ def run_case(
             budget_after_tokens <= budget if is_budget_case else None
         ),
         "accuracy_before_budget": (
-            int(answer_metrics(
-                prediction_before,
-                case.expected_answer,
-                case.answer_aliases,
-            )["answer_accuracy"])
-            if prediction_before is not None
+            int(before_answer["answer_accuracy"])
+            if before_answer is not None
             else None
         ),
         "accuracy_after_budget": answer_correct if is_budget_case else None,
+        "budget_task_success": (
+            int(answer_correct == 1 and budget_after_tokens <= budget)
+            if is_budget_case
+            else None
+        ),
         "budget_accuracy_delta": (
             answer_correct
-            - int(answer_metrics(
-                prediction_before,
-                case.expected_answer,
-                case.answer_aliases,
-            )["answer_accuracy"])
-            if prediction_before is not None
+            - int(before_answer["answer_accuracy"])
+            if before_answer is not None
             else None
         ),
         "budget_token_delta": (
@@ -512,11 +527,22 @@ def _failure_row(
         "query_time": case.memory_query_time,
         "expected_answer": case.expected_answer,
         "answer_aliases": case.answer_aliases,
+        "answer_spec": case.answer_spec,
+        "answer_scorer_version": (
+            case.answer_spec.get("scorer_version")
+            if case.answer_spec is not None
+            else "legacy-answer-v1"
+        ),
         "expected_version": case.expected_version,
         "prediction": "",
         "correct": None,
         "exact_match": None,
         "normalized_match": None,
+        "strict_answer_match": None,
+        "strict_answer_accuracy": None,
+        "semantic_answer_match": None,
+        "semantic_answer_accuracy": None,
+        "answer_format_compliance": None,
         "answer_match": None,
         "answer_accuracy": None,
         "answer_precision": None,
@@ -595,6 +621,9 @@ def summarize(rows: Iterable[dict]) -> list[dict]:
         for key in (
             "exact_match",
             "normalized_match",
+            "strict_answer_accuracy",
+            "semantic_answer_accuracy",
+            "answer_format_compliance",
             "answer_accuracy",
             "answer_precision",
             "answer_recall",
@@ -656,6 +685,7 @@ def summarize(rows: Iterable[dict]) -> list[dict]:
             "budget_before_context_tokens",
             "budget_after_context_tokens",
             "budget_satisfied",
+            "budget_task_success",
             "accuracy_before_budget",
             "accuracy_after_budget",
             "budget_accuracy_delta",

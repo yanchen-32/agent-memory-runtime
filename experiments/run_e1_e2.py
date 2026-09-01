@@ -14,6 +14,8 @@ if str(ROOT) not in sys.path:
 
 from agent import ANSWER_FORMAT_VERSION, OpenAICompatibleClient, RuleBasedClient
 from benchmark import (
+    LEGACY_ANSWER_SCORER_VERSION,
+    QUANTITY_ANSWER_SCORER_VERSION,
     JsonlRunCheckpoint,
     ReusableEmbeddingFactory,
     collect_environment,
@@ -151,6 +153,10 @@ def main() -> None:
         "embedding_model": args.embedding_model,
         "trace": args.trace,
         "answer_format_version": ANSWER_FORMAT_VERSION,
+        "answer_scorer_versions": [
+            LEGACY_ANSWER_SCORER_VERSION,
+            QUANTITY_ANSWER_SCORER_VERSION,
+        ],
         "benchmark_review_enforced": not args.allow_unreviewed_benchmark,
     }
     checkpoint = JsonlRunCheckpoint(
@@ -175,6 +181,7 @@ def main() -> None:
 
     e1_rows = [row for row in rows if row["category"] in E1_CATEGORIES]
     e2_rows = [row for row in rows if row["category"] in E2_CATEGORIES]
+    budget_rows = [row for row in e1_rows if row["category"] == "budget"]
     generated_at = datetime.now(timezone.utc).isoformat()
     environment = collect_environment(ROOT, args.benchmark)
 
@@ -189,6 +196,16 @@ def main() -> None:
         "E2_answer_f1_B1_vs_Ours": paired_bootstrap_comparison(
             e2_rows, samples=args.bootstrap_samples
         ),
+        "Budget_semantic_accuracy_B1_vs_Ours": paired_bootstrap_comparison(
+            budget_rows,
+            metric="semantic_answer_accuracy",
+            samples=args.bootstrap_samples,
+        ),
+        "Budget_task_success_B1_vs_Ours": paired_bootstrap_comparison(
+            budget_rows,
+            metric="budget_task_success",
+            samples=args.bootstrap_samples,
+        ),
         "E1_e2e_latency_B1_vs_Ours": paired_latency_reduction(e1_rows),
         "E2_e2e_latency_B1_vs_Ours": paired_latency_reduction(e2_rows),
     }
@@ -200,6 +217,15 @@ def main() -> None:
             comparison["failure_count"] = failure_count
             if failure_count:
                 comparison["invalid_reason"] = "terminal run failures present"
+    budget_failure_count = sum(row.get("status") == "failed" for row in budget_rows)
+    for key in (
+        "Budget_semantic_accuracy_B1_vs_Ours",
+        "Budget_task_success_B1_vs_Ours",
+    ):
+        comparisons[key]["formal_comparison_valid"] = budget_failure_count == 0
+        comparisons[key]["failure_count"] = budget_failure_count
+        if budget_failure_count:
+            comparisons[key]["invalid_reason"] = "terminal Budget run failures present"
     safe_config = {
         "protocol_version": args.protocol_version,
         "benchmark": str(args.benchmark.resolve()),
@@ -228,6 +254,10 @@ def main() -> None:
         "bootstrap_samples": args.bootstrap_samples,
         "bootstrap_seed": 202601,
         "answer_format_version": ANSWER_FORMAT_VERSION,
+        "answer_scorer_versions": [
+            LEGACY_ANSWER_SCORER_VERSION,
+            QUANTITY_ANSWER_SCORER_VERSION,
+        ],
         "benchmark_review_enforced": not args.allow_unreviewed_benchmark,
     }
 
@@ -313,6 +343,15 @@ def main() -> None:
                 f"p50={latency_p50 if latency_p50 is not None else 'NA'} ms, "
                 f"p95={latency_p95 if latency_p95 is not None else 'NA'} ms"
             )
+    print("Budget scoring summary:")
+    for item in summarize(budget_rows):
+        print(
+            f"  {item['agent']}: "
+            f"semantic_accuracy={item['avg_semantic_answer_accuracy']}, "
+            f"format_compliance={item['avg_answer_format_compliance']}, "
+            f"constraint_satisfaction={item['avg_budget_satisfied']}, "
+            f"task_success={item['avg_budget_task_success']}"
+        )
 
 
 if __name__ == "__main__":

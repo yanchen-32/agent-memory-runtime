@@ -77,6 +77,49 @@ supports freezing the current Test configuration if avoiding post-Development
 overfitting is the priority, but it also identifies the exact areas for a later
 method revision after the frozen Test decision.
 
+### Why the frozen Ours score is only 56.94%
+
+The strict score is `41 / 72 = 56.94%`, but retrieval failure is not the main
+cause. The expected memory ranked first in all 72 Ours Budget runs. The 31
+strictly incorrect rows decompose exactly into:
+
+| Driver | Rows | Share of strict errors | Interpretation |
+| --- | ---: | ---: | --- |
+| Correct number plus Chinese measure word, such as `5条` or `5条。` | 22 | 70.97% | Semantically correct but rejected because the frozen target contains only `5` and no unit alias |
+| `UNKNOWN` | 9 | 29.03% | Genuine answer failure despite the target memory being ranked first |
+
+Under a post-hoc unit-tolerant sensitivity check that accepts `N`, `N条`, and
+`N条。` as equivalent, Ours scores `63 / 72 = 87.50%`. This is diagnostic only,
+not a replacement for the frozen official score. The same missing-unit-alias
+effect appears in B2 (14 rows) and B3 (22 rows), so it is a benchmark/scoring
+interaction rather than an Ours-only defect.
+
+The result is strongly concentrated by question wording:
+
+| Normalized question form | Strict accuracy | Unit-tolerant accuracy | Main behavior |
+| --- | ---: | ---: | --- |
+| `检索 Top-K 是多少？` | 12 / 12 | 12 / 12 | Bare number |
+| `请给出设定的 Top-K？` | 12 / 12 | 12 / 12 | Bare number |
+| `每次取回多少条候选记忆？` | 2 / 12 | 12 / 12 | Usually adds `条` |
+| `Top-K 参数为何？` | 12 / 12 | 12 / 12 | Bare number |
+| `固定检索几条结果？` | 0 / 12 | 12 / 12 | Always adds `条` |
+| `检索数量上限？` | 3 / 12 | 3 / 12 | Nine `UNKNOWN` responses |
+
+The wording pattern explains the entire 56.94% result: three templates produce
+36/36 correct rows, the two measure-word templates contribute only 2/24 under
+strict matching, and the `数量上限` template contributes 3/12.
+
+Budgeting still has a measurable effect, but it does not remove the target
+evidence. Before enforcing 80 tokens, strict Ours accuracy was 52/72 (72.22%);
+after enforcement it was 41/72 (56.94%), a net decline of 11 rows or 15.28
+percentage points. Forty rows were correct both times, 19 were incorrect both
+times, 12 changed from correct to incorrect, and one changed from incorrect to
+correct. Average prompt size fell from 88.67 to 76.26 tokens, while average
+context fell from 43.00 to 30.60 tokens. Because the before/after values come
+from separate DeepSeek calls and temperature zero is not guaranteed to be
+deterministic, this comparison establishes prompt sensitivity, not that context
+truncation alone caused every changed answer.
+
 ## Scope, data, and metric definitions
 
 - Benchmark grain: one question over one synthetic conversation.
@@ -134,6 +177,10 @@ the historical, forbidden-retrieval, and Budget predicates.
   repeats were evaluated.
 - DeepSeek output showed minor nondeterminism despite temperature 0: Ours had
   three cases with different normalized predictions across repeats.
+- The frozen Budget score conflates shortest-format adherence with semantic
+  correctness. A response such as `5条` violates the requested bare shortest
+  format but is a natural Chinese answer to `多少条`; whether it should count is
+  a protocol-design choice, not a retrieval question.
 - B1 matches Ours on E2 answers because full history plus the shared temporal
   explanation is sufficient on these questions. The differentiating evidence
   is Ours' zero forbidden retrieval, not E2 answer accuracy alone.
@@ -151,11 +198,14 @@ the historical, forbidden-retrieval, and Budget predicates.
    the exact current configuration before any Test call.
 2. Record a Git checkpoint containing this acceptance report; keep raw result
    artifacts outside Git if required by the repository's result policy.
-3. Obtain separate authorization before sending the frozen Test split to an
+3. Apply the decision in `answer_scoring_protocol_v1.2.md`: keep 56.94% as the
+   frozen v1.1 result, create reviewed typed answer contracts for v1.2, and
+   rerun Development before treating semantic scoring as official.
+4. Obtain separate authorization before sending the frozen Test split to an
    external API. Run Test once in a new output directory without `--resume`.
-4. Do not tune from Test. Reserve Holdout for the final evaluator-controlled
+5. Do not tune from Test. Reserve Holdout for the final evaluator-controlled
    run.
-5. After the frozen Test decision, investigate short-answer normalization for
+6. After the frozen Test decision, investigate short-answer normalization for
    Multi-hop and evidence allocation under the 80-token Budget as a separate
    method version rather than silently changing the evaluated configuration.
 

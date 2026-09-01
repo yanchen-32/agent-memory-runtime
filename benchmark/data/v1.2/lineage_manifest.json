@@ -1,0 +1,17 @@
+{
+  "allowed_case_changes": [
+    "metadata benchmark/review/generator/author/lineage fields",
+    "answer_spec on budget cases"
+  ],
+  "migration_type": "scoring_contract_only",
+  "parent_benchmark_version": "1.1",
+  "parent_frozen_manifest_file": "/root/agent-memory-runtime/benchmark/data/v1.1/frozen_manifest.json",
+  "parent_frozen_manifest_sha256": "d6744288d20f22a8ac0c78ecc046c3d0dd03cb7f9825675fe004b02dfa18172f",
+  "parent_split_sha256": {
+    "development": "c32d229b3253b2e2a7a2167a9c4e061f8ad9f637779d3c1fb798952439a45ea8",
+    "holdout": "b2ac2a367c1f96cd8765dc55c5a35993b99f08ff213e2e48cf54ddc61eecb2c4",
+    "test": "fc1bcf164c713ddceefaf45cfe375f3b696ca834905ce85ef18b237df89b1059"
+  },
+  "scoring_protocol_file": "/root/agent-memory-runtime/docs/answer_scoring_protocol_v1.2.md",
+  "scoring_protocol_sha256": "5cb7683adc8f351c0acd7dc4192005ac371fa30ad6410d869fa2fe58616c85b9"
+}

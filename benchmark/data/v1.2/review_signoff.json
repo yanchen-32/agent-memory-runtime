@@ -1,0 +1,17 @@
+{
+  "attestation": "I reviewed the v1.2 scoring-migration audit and approve the bound 480-case Development/Test/Holdout set for freezing.",
+  "benchmark_version": "1.2-candidate",
+  "decision": "approved",
+  "deep_audit_file": "deep_audit.json",
+  "deep_audit_sha256": "ec604094337c8539ab78e65af9dceda3009db091c6e8bd81b323d91268568d57",
+  "review_checklist_file": "review_checklist.csv",
+  "review_checklist_sha256": "dcda9c30c7b32e870ab8fb98795bc4487509f497a31c2fdfde2ee5de56ab7bf4",
+  "reviewed_case_count": 480,
+  "reviewer": "Zhang",
+  "scope": "all_development_test_holdout_scoring_candidates",
+  "split_sha256": {
+    "development": "46d856387fec4d77ffc99841407f73afe6dc820503e5b361bf262349e91775c6",
+    "holdout": "9aeeacd8528d587ab348001a188093819eabb56b178d3a4e8e0ab5086d178144",
+    "test": "d20b522e90af47ce61e457cfaca2521438285df9d477ce16d97e89d0a6b9e9ea"
+  }
+}
