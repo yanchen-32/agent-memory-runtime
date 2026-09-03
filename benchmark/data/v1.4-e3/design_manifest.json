@@ -1,0 +1,26 @@
+{
+  "design_file": "orthogonal_design.jsonl",
+  "design_sha256": "d927f422699f7b9cbd104d07a81b411d6e7c00c50e42ac31797707d7d0094ee5",
+  "design_version": "v1.4-e3-design.0",
+  "factor_levels": {
+    "predicates": 6,
+    "query_templates": 8,
+    "target_positions": 3
+  },
+  "full_factorial": true,
+  "holdout_generated": false,
+  "pairwise_orthogonal": true,
+  "planned_development_cases": 576,
+  "planned_strata": {
+    "long": 16000,
+    "medium": 4000,
+    "short": 1000,
+    "very_long": 32000
+  },
+  "pre_registration_note": "Generate semantic case content only after the v1.3 Development ablation choice is locked.",
+  "scenario_families": 144,
+  "source_benchmark": "v1.3-e3 Development diagnostics only",
+  "status": "design_only_pending_candidate_generation",
+  "test_generated": false,
+  "valid": true
+}
