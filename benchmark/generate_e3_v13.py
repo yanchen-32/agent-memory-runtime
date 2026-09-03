@@ -9,21 +9,22 @@ exact B1 prompt construction and the project's deterministic token estimator.
 from __future__ import annotations
 
 import argparse
+from bisect import bisect_left
 import csv
 from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import random
 
-from agent import FullHistoryAgent
+from agent import FullHistoryAgent, estimate_tokens
 
 from .artifacts import sha256_file
 
 
-GENERATOR_VERSION = "v1.3-e3.0"
+GENERATOR_VERSION = "v1.3-e3.1"
 BENCHMARK_VERSION = "1.3-e3-candidate"
 DEFAULT_SEED = 20260903
-SCENARIOS_PER_STRATUM = 24
+SCENARIOS_PER_STRATUM = 48
 STRATA = {
     "short": 1_000,
     "medium": 4_000,
@@ -33,6 +34,35 @@ STRATA = {
 TOKEN_TOLERANCE_RATIO = 0.05
 BASE_TIME = datetime(2024, 1, 1, 9, tzinfo=timezone(timedelta(hours=8)))
 MAX_MEMORY_COUNT = 2_000
+PREDICATE_SPECS = (
+    ("数据库", "GaussDB", "SQLite"),
+    ("部署平台", "鲲鹏节点", "x86节点"),
+    ("架构", "微服务", "单体"),
+    ("项目名称", "星桥计划", "旧港计划"),
+    ("截止日期", "2027年", "2026年"),
+    ("答辩日期", "2028年", "2027年"),
+)
+QUERY_TEMPLATES = (
+    "{subject}当前的{predicate}是什么？",
+    "请给出{subject}现行的{predicate}？",
+    "最新记录中，{subject}采用的{predicate}是什么？",
+    "{subject}目前登记的{predicate}是哪一项？",
+    "请从长期记录中找出{subject}最新的{predicate}？",
+    "大量历史记录里，{subject}现在使用什么{predicate}？",
+    "按当前有效状态回答：{subject}的{predicate}是什么？",
+    "忽略已经失效的旧值，{subject}的{predicate}现在是什么？",
+)
+TARGET_POSITION_SPECS = (
+    ("front", 1),
+    ("middle", 8),
+    ("back", 17),
+)
+DISTRACTOR_KINDS = (
+    "unrelated",
+    "same_predicate_other_subject",
+    "same_subject_other_predicate",
+    "lexical_decoy",
+)
 REVIEW_FIELDS = (
     "case_id",
     "scenario_family",
@@ -88,7 +118,27 @@ def _memory(
     return record
 
 
-def _distractor_content(scenario_index: int, offset: int, rng: random.Random) -> str:
+def _scenario_answers(scenario_index: int, predicate_index: int) -> tuple[str, str]:
+    predicate, current_prefix, old_prefix = PREDICATE_SPECS[predicate_index]
+    if predicate in {"截止日期", "答辩日期"}:
+        month = scenario_index % 12 + 1
+        day = scenario_index % 27 + 1
+        return (
+            f"{current_prefix}{month}月{day}日",
+            f"{old_prefix}{month}月{day}日",
+        )
+    return f"{current_prefix}-{scenario_index + 1:02d}", f"{old_prefix}-{scenario_index + 1:02d}"
+
+
+def _distractor_content(
+    scenario_index: int,
+    offset: int,
+    rng: random.Random,
+    *,
+    subject: str,
+    predicate: str,
+) -> tuple[str, str]:
+    kind = DISTRACTOR_KINDS[(offset + scenario_index) % len(DISTRACTOR_KINDS)]
     subjects = ("巡检作业", "备份任务", "文档流水线", "日志归档", "依赖扫描", "构建批次")
     actions = (
         "完成校验并登记了摘要与责任队列",
@@ -96,80 +146,130 @@ def _distractor_content(scenario_index: int, offset: int, rng: random.Random) ->
         "完成例行检查并更新了非关键审计备注",
         "保存了构建日志、依赖摘要与备份索引",
     )
-    subject = subjects[(offset + scenario_index) % len(subjects)]
     action = actions[rng.randrange(len(actions))]
-    return f"{subject}{scenario_index + 1:02d}-{offset:04d}{action}。"
+    if kind == "unrelated":
+        noise_subject = subjects[(offset + scenario_index) % len(subjects)]
+        content = f"{noise_subject}{scenario_index + 1:02d}-{offset:04d}{action}。"
+    elif kind == "same_predicate_other_subject":
+        content = f"旁路单元{scenario_index + 1:02d}-{offset:04d}{predicate}为 辅助值-{offset:04d}。"
+    elif kind == "same_subject_other_predicate":
+        predicates = [item[0] for item in PREDICATE_SPECS if item[0] != predicate]
+        other_predicate = predicates[(offset + scenario_index) % len(predicates)]
+        content = f"{subject}{other_predicate}为 辅助配置-{offset:04d}。"
+    else:
+        content = (
+            f"{subject}的审计索引{offset:04d}包含“{predicate}”字段名称，"
+            "但该索引不保存字段取值。"
+        )
+    return content, kind
 
 
 def _full_history(scenario_index: int, rng: random.Random) -> tuple[list[dict], dict]:
-    subject = f"极光部署单元{scenario_index + 1:02d}"
-    answer = f"星桥-{scenario_index + 1:02d}"
-    old_answer = f"旧港-{scenario_index + 1:02d}"
+    predicate_index = scenario_index % len(PREDICATE_SPECS)
+    predicate = PREDICATE_SPECS[predicate_index][0]
+    subject = f"极光记忆单元{scenario_index + 1:02d}"
+    answer, old_answer = _scenario_answers(scenario_index, predicate_index)
     family = f"v13_e3_dev_family_{scenario_index + 1:03d}"
-    old_id = f"{family}_platform_v1"
-    target_id = f"{family}_platform_v2"
-    target_time = _time(scenario_index, 1)
-    conversation = [
-        _memory(
-            old_id,
-            f"{subject}部署平台为 {old_answer}。",
-            scenario_index,
-            0,
-            valid_to=target_time,
-        ),
-        _memory(
-            target_id,
-            f"{subject}部署平台改为 {answer}。",
-            scenario_index,
-            1,
-        ),
+    old_id = f"{family}_fact_v1"
+    target_id = f"{family}_fact_v2"
+    position_band, old_position = TARGET_POSITION_SPECS[
+        scenario_index % len(TARGET_POSITION_SPECS)
     ]
-    for offset in range(2, MAX_MEMORY_COUNT):
-        conversation.append(
-            _memory(
-                f"{family}_noise_{offset:04d}",
-                _distractor_content(scenario_index, offset, rng),
+    target_position = old_position + 1
+    target_time = _time(scenario_index, target_position)
+    conversation = []
+    distractor_kinds = set()
+    for offset in range(MAX_MEMORY_COUNT):
+        if offset == old_position:
+            turn = _memory(
+                old_id,
+                f"{subject}{predicate}为 {old_answer}。",
+                scenario_index,
+                offset,
+                valid_to=target_time,
+            )
+        elif offset == target_position:
+            turn = _memory(
+                target_id,
+                f"{subject}{predicate}改为 {answer}。",
                 scenario_index,
                 offset,
             )
-        )
+        else:
+            content, kind = _distractor_content(
+                scenario_index,
+                offset,
+                rng,
+                subject=subject,
+                predicate=predicate,
+            )
+            distractor_kinds.add(kind)
+            turn = _memory(
+                f"{family}_noise_{offset:04d}",
+                content,
+                scenario_index,
+                offset,
+            )
+        conversation.append(turn)
     return conversation, {
         "subject": subject,
-        "predicate": "部署平台",
+        "predicate": predicate,
+        "predicate_index": predicate_index,
         "answer": answer,
         "old_answer": old_answer,
         "family": family,
         "old_id": old_id,
         "target_id": target_id,
-        "query": f"{subject}当前的部署平台是什么？",
+        "query": QUERY_TEMPLATES[scenario_index % len(QUERY_TEMPLATES)].format(
+            subject=subject,
+            predicate=predicate,
+        ),
+        "query_template_index": scenario_index % len(QUERY_TEMPLATES),
+        "target_position": target_position,
+        "target_position_band": position_band,
+        "distractor_kinds": sorted(distractor_kinds),
     }
 
 
-def _prefix_for_target(conversation: list[dict], query: str, target: int) -> tuple[list[dict], int]:
-    low, high = 2, len(conversation)
+def _prefix_token_counts(conversation: list[dict], query: str) -> list[int]:
+    total = b1_prompt_tokens([], query)
+    counts = []
+    for index, turn in enumerate(conversation, start=1):
+        content = str(turn.get("content", "")).strip()
+        timestamp = turn.get("valid_from") or turn.get("created_at")
+        line = f"MEMORY[{index}] TIME[{timestamp}] {content}"
+        total += estimate_tokens(line)
+        counts.append(total)
+    return counts
+
+
+def _prefix_for_target(
+    conversation: list[dict],
+    query: str,
+    prefix_counts: list[int],
+    target: int,
+) -> tuple[list[dict], int]:
     if b1_prompt_tokens(conversation, query) < target:
         raise ValueError(f"MAX_MEMORY_COUNT cannot reach {target} B1 prompt tokens")
-    while low < high:
-        middle = (low + high) // 2
-        if b1_prompt_tokens(conversation[:middle], query) < target:
-            low = middle + 1
-        else:
-            high = middle
-    prefix = conversation[:low]
+    prefix_length = bisect_left(prefix_counts, target) + 1
+    prefix = conversation[:prefix_length]
     measured = b1_prompt_tokens(prefix, query)
+    if measured != prefix_counts[prefix_length - 1]:
+        raise AssertionError("incremental B1 token measurement drifted from actual prompt")
     return prefix, measured
 
 
 def build_development(seed: int = DEFAULT_SEED) -> list[dict]:
-    """Build 24 matched scenarios at each of four B1 prompt-token strata."""
+    """Build 48 matched scenarios at each of four B1 prompt-token strata."""
     cases: list[dict] = []
     for scenario_index in range(SCENARIOS_PER_STRATUM):
         rng = random.Random(seed + scenario_index * 10_007)
         history, spec = _full_history(scenario_index, rng)
+        prefix_counts = _prefix_token_counts(history, spec["query"])
         previous_count = 0
         for stratum, target_tokens in STRATA.items():
             conversation, measured_tokens = _prefix_for_target(
-                history, spec["query"], target_tokens
+                history, spec["query"], prefix_counts, target_tokens
             )
             if len(conversation) <= previous_count:
                 raise AssertionError("E3 strata must add at least one memory")
@@ -200,7 +300,12 @@ def build_development(seed: int = DEFAULT_SEED) -> list[dict]:
                     "history_memory_count": len(conversation),
                     "subject": spec["subject"],
                     "predicate": spec["predicate"],
+                    "predicate_index": spec["predicate_index"],
                     "old_answer": spec["old_answer"],
+                    "target_memory_ordinal": spec["target_position"] + 1,
+                    "target_position_band": spec["target_position_band"],
+                    "distractor_kinds": spec["distractor_kinds"],
+                    "query_template_index": spec["query_template_index"],
                     "query_mode": "current",
                     "author": "amr-e3-v13-generator",
                     "review_status": "pending_human_review",

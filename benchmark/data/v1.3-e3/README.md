@@ -5,15 +5,18 @@ Status: `pending_human_review`
 The predeclared measurement and admission rules are in
 `docs/experiment_protocol_v1.3_e3.md`.
 
-This candidate isolates long-history scale. It contains 24 matched scenario
-families and four prefix-nested variants per family, for 96 Development cases:
+This candidate isolates long-history scale. It contains 48 matched scenario
+families and four prefix-nested variants per family, for 192 Development cases:
 
 | Stratum | Target unconstrained B1 prompt tokens | Cases |
 | --- | ---: | ---: |
-| Short | 1,000 | 24 |
-| Medium | 4,000 | 24 |
-| Long | 16,000 | 24 |
-| Very Long | 32,000 | 24 |
+| Short | 1,000 | 48 |
+| Medium | 4,000 | 48 |
+| Long | 16,000 | 48 |
+| Very Long | 32,000 | 48 |
+
+The independent families jointly cover six predicates, eight question
+templates, front/middle/back target positions, and four distractor types.
 
 Within a family, the question, current target fact, answer, expected memory ID,
 and stale forbidden memory ID are identical. A larger stratum is a strict
@@ -32,6 +35,16 @@ Regenerate and validate:
 ```bash
 python -m benchmark.generate_e3_v13
 python -m benchmark.validate_e3_v13
+python -m benchmark.prereview_e3_v13
+python -m benchmark.audit_e3_v13
+```
+
+The last two commands complete the case-level technical review and recreate a
+single hash-bound `review_signoff.json`. The human reviewer fills `reviewer`
+and changes `decision` to `approved` once, then runs:
+
+```bash
+python -m benchmark.freeze_e3_v13
 ```
 
 The generated files are Development candidates only. No Test or Holdout split

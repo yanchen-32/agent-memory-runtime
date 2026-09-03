@@ -1,0 +1,85 @@
+{
+  "answer_leakage_free": true,
+  "audit_version": "v1.3-e3.1",
+  "benchmark_version": "1.3-e3-candidate",
+  "candidate_manifest_consistent": true,
+  "case_count": 192,
+  "development_sha256": "159b9a723086e4728e3f99ab08f531bf5efcf5e3a464a41c95c82c4e6010d02f",
+  "distractor_kinds": [
+    "lexical_decoy",
+    "same_predicate_other_subject",
+    "same_subject_other_predicate",
+    "unrelated"
+  ],
+  "failures": [],
+  "forbidden_split_files": [],
+  "human_signatures_present": 0,
+  "predicate_distribution": {
+    "截止日期": 8,
+    "数据库": 8,
+    "架构": 8,
+    "答辩日期": 8,
+    "部署平台": 8,
+    "项目名称": 8
+  },
+  "query_template_distribution": {
+    "0": 6,
+    "1": 6,
+    "2": 6,
+    "3": 6,
+    "4": 6,
+    "5": 6,
+    "6": 6,
+    "7": 6
+  },
+  "review_exact_coverage": true,
+  "review_sha256": "1a566ba8fe248139a0c280f66330ab7369f219a8816f5892b25cdcb5296daee5",
+  "scenario_family_count": 48,
+  "status": "passed_pending_human_review",
+  "strata": {
+    "long": 48,
+    "medium": 48,
+    "short": 48,
+    "very_long": 48
+  },
+  "strict_prefix_nested": true,
+  "target_position_distribution": {
+    "back": 16,
+    "front": 16,
+    "middle": 16
+  },
+  "technical_fields_all_yes": true,
+  "technical_prereview_consistent": true,
+  "technical_review_rows": 192,
+  "token_ranges": {
+    "long": {
+      "max_b1_prompt_tokens": 16054,
+      "max_history_memory_count": 365,
+      "min_b1_prompt_tokens": 16000,
+      "min_history_memory_count": 356,
+      "target_b1_prompt_tokens": 16000
+    },
+    "medium": {
+      "max_b1_prompt_tokens": 4057,
+      "max_history_memory_count": 91,
+      "min_b1_prompt_tokens": 4001,
+      "min_history_memory_count": 88,
+      "target_b1_prompt_tokens": 4000
+    },
+    "short": {
+      "max_b1_prompt_tokens": 1042,
+      "max_history_memory_count": 23,
+      "min_b1_prompt_tokens": 1001,
+      "min_history_memory_count": 21,
+      "target_b1_prompt_tokens": 1000
+    },
+    "very_long": {
+      "max_b1_prompt_tokens": 32056,
+      "max_history_memory_count": 729,
+      "min_b1_prompt_tokens": 32002,
+      "min_history_memory_count": 713,
+      "target_b1_prompt_tokens": 32000
+    }
+  },
+  "valid": true
+}

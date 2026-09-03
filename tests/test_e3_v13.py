@@ -1,6 +1,5 @@
 from collections import Counter
 import json
-from pathlib import Path
 
 import pytest
 
@@ -11,11 +10,15 @@ from benchmark.generate_e3_v13 import (
     build_development,
     write_development,
 )
+from benchmark.audit_e3_v13 import write_audit
+from benchmark.execution import require_frozen_benchmark
+from benchmark.freeze_e3_v13 import freeze_benchmark_e3_v13
+from benchmark.prereview_e3_v13 import prereview_candidates
 from benchmark.validate_e3_v13 import validate_development
 from experiments.run_e3_scaling import build_e3_analysis
 
 
-EXPECTED_DEVELOPMENT_SHA256 = "a13736ab2b4ca62eb9c168f21614fcf2899a936b3343167bc83133383d792744"
+EXPECTED_DEVELOPMENT_SHA256 = "159b9a723086e4728e3f99ab08f531bf5efcf5e3a464a41c95c82c4e6010d02f"
 
 
 @pytest.fixture(scope="module")
@@ -53,7 +56,39 @@ def test_e3_written_candidate_validates_and_hash_is_stable(tmp_path):
     assert report["prefix_nested"] is True
     assert report["answer_leakage_free"] is True
     assert report["holdout_generated"] is False
-    assert report["strata"] == {stratum: 24 for stratum in STRATA}
+    assert report["strata"] == {
+        stratum: SCENARIOS_PER_STRATUM for stratum in STRATA
+    }
+    assert len(report["predicate_distribution"]) == 6
+    assert len(report["query_template_distribution"]) == 8
+    assert set(report["target_position_distribution"]) == {"front", "middle", "back"}
+
+
+def test_e3_prereview_audit_one_signoff_and_freeze(tmp_path):
+    write_development(tmp_path, DEFAULT_SEED)
+    prereview = prereview_candidates(tmp_path)
+    audit = write_audit(tmp_path)
+    assert prereview["checked_cases"] == SCENARIOS_PER_STRATUM * len(STRATA)
+    assert prereview["technical_failures"] == 0
+    assert audit["valid"] is True
+    assert audit["technical_fields_all_yes"] is True
+    assert audit["human_signatures_present"] == 0
+
+    with pytest.raises(ValueError, match="one-time human review signoff incomplete"):
+        freeze_benchmark_e3_v13(tmp_path)
+
+    signoff_path = tmp_path / "review_signoff.json"
+    signoff = json.loads(signoff_path.read_text(encoding="utf-8"))
+    signoff["reviewer"] = "test-reviewer"
+    signoff["decision"] = "approved"
+    signoff_path.write_text(
+        json.dumps(signoff, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    frozen = freeze_benchmark_e3_v13(tmp_path)
+    assert frozen["status"] == "frozen"
+    assert frozen["reviewed_case_count"] == SCENARIOS_PER_STRATUM * len(STRATA)
+    assert require_frozen_benchmark(tmp_path / "development.jsonl")["status"] == "frozen"
 
 
 def _passing_rows():

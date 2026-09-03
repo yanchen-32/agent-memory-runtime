@@ -20,17 +20,21 @@ a Test or Holdout split.
 
 ## Controlled design
 
-There are 24 scenario families. Every family has the same question, current
+There are 48 scenario families. Every family has the same question, current
 target fact, expected answer, expected memory ID, and stale forbidden memory ID
 at four history sizes. Larger variants are strict prefix extensions: only
 chronologically later distractor memories are appended.
 
 | Stratum | Target unconstrained B1 prompt tokens | Cases |
 | --- | ---: | ---: |
-| Short | 1,000 | 24 |
-| Medium | 4,000 | 24 |
-| Long | 16,000 | 24 |
-| Very Long | 32,000 | 24 |
+| Short | 1,000 | 48 |
+| Medium | 4,000 | 48 |
+| Long | 16,000 | 48 |
+| Very Long | 32,000 | 48 |
+
+The 48 independent families cover six predicates, eight question templates,
+three target-position bands, and four distractor types. Diversity is balanced
+at the scenario-family level and does not vary across a family's four strata.
 
 The generator constructs the actual B1 prompt and measures it with the
 project's deterministic token estimator. A candidate is valid within +/-5% of
@@ -89,9 +93,13 @@ that result.
 ```bash
 python -m benchmark.generate_e3_v13
 python -m benchmark.validate_e3_v13
+python -m benchmark.prereview_e3_v13
+python -m benchmark.audit_e3_v13
 ```
 
-After technical review and human signoff, freeze the candidate in a separate
-checkpoint. Then run `experiments/run_e3_scaling.py` in a new output directory
-with real DeepSeek and BGE. Until that freeze exists, only explicitly labelled
-`--allow-unreviewed-benchmark` pilots are permitted.
+The prereview fills all 192 case-level technical fields. The audit recreates a
+hash-bound `review_signoff.json`; the human reviewer edits only `reviewer` and
+`decision` (`approved`) once, then runs `python -m benchmark.freeze_e3_v13`.
+The formal experiment must use `experiments/run_e3_scaling.py` in a new output
+directory with real DeepSeek and BGE. Until that freeze exists, only explicitly
+labelled `--allow-unreviewed-benchmark` pilots are permitted.

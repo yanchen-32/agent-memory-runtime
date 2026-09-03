@@ -13,9 +13,13 @@ from memory import RuleMemoryExtractor
 from .artifacts import sha256_file
 from .generate_e3_v13 import (
     BENCHMARK_VERSION,
+    DISTRACTOR_KINDS,
     GENERATOR_VERSION,
+    PREDICATE_SPECS,
+    QUERY_TEMPLATES,
     SCENARIOS_PER_STRATUM,
     STRATA,
+    TARGET_POSITION_SPECS,
     TOKEN_TOLERANCE_RATIO,
     b1_prompt_tokens,
 )
@@ -36,7 +40,12 @@ REQUIRED_METADATA = {
     "history_memory_count",
     "subject",
     "predicate",
+    "predicate_index",
     "old_answer",
+    "target_memory_ordinal",
+    "target_position_band",
+    "distractor_kinds",
+    "query_template_index",
     "query_mode",
     "author",
     "review_status",
@@ -52,6 +61,16 @@ def _point(value: object, field: str, case_id: str) -> datetime:
     if parsed.tzinfo is None:
         raise ValueError(f"{case_id}: {field} must include timezone")
     return parsed
+
+
+def _distractor_kind(content: str, subject: str) -> str:
+    if "审计索引" in content:
+        return "lexical_decoy"
+    if content.startswith("旁路单元"):
+        return "same_predicate_other_subject"
+    if content.startswith(subject):
+        return "same_subject_other_predicate"
+    return "unrelated"
 
 
 def _validate_case(case: BenchmarkCase) -> None:
@@ -129,6 +148,20 @@ def _validate_case(case: BenchmarkCase) -> None:
     subject = str(metadata["subject"])
     predicate = str(metadata["predicate"])
     old_answer = str(metadata["old_answer"])
+    predicate_index = int(metadata["predicate_index"])
+    if not 0 <= predicate_index < len(PREDICATE_SPECS):
+        raise ValueError(f"{case.case_id}: predicate index out of range")
+    if PREDICATE_SPECS[predicate_index][0] != predicate:
+        raise ValueError(f"{case.case_id}: predicate index metadata mismatch")
+    query_template_index = int(metadata["query_template_index"])
+    if not 0 <= query_template_index < len(QUERY_TEMPLATES):
+        raise ValueError(f"{case.case_id}: query template index out of range")
+    expected_query = QUERY_TEMPLATES[query_template_index].format(
+        subject=subject,
+        predicate=predicate,
+    )
+    if case.query != expected_query:
+        raise ValueError(f"{case.case_id}: query template metadata mismatch")
     if old_answer == case.expected_answer:
         raise ValueError(f"{case.case_id}: stale and current answers are identical")
     if subject not in case.query or predicate not in case.query:
@@ -145,6 +178,31 @@ def _validate_case(case: BenchmarkCase) -> None:
         raise ValueError(f"{case.case_id}: target fact key mismatch")
     if old_fact.object_value != old_answer or target_fact.object_value != case.expected_answer:
         raise ValueError(f"{case.case_id}: extractor-visible answer mismatch")
+
+    old_index = next(
+        index for index, turn in enumerate(case.conversation) if turn["memory_id"] == old_id
+    )
+    target_index = next(
+        index for index, turn in enumerate(case.conversation) if turn["memory_id"] == target_id
+    )
+    if target_index != old_index + 1:
+        raise ValueError(f"{case.case_id}: stale/current versions must be adjacent")
+    if int(metadata["target_memory_ordinal"]) != target_index + 1:
+        raise ValueError(f"{case.case_id}: target position metadata mismatch")
+    expected_positions = {band: position + 2 for band, position in TARGET_POSITION_SPECS}
+    position_band = str(metadata["target_position_band"])
+    if expected_positions.get(position_band) != target_index + 1:
+        raise ValueError(f"{case.case_id}: target position band mismatch")
+
+    observed_kinds = {
+        _distractor_kind(str(turn["content"]), subject)
+        for turn in case.conversation
+        if turn["memory_id"] not in {old_id, target_id}
+    }
+    if observed_kinds != set(DISTRACTOR_KINDS):
+        raise ValueError(f"{case.case_id}: incomplete distractor diversity: {observed_kinds}")
+    if set(metadata["distractor_kinds"]) != observed_kinds:
+        raise ValueError(f"{case.case_id}: distractor-kind metadata mismatch")
 
 
 def _validate_family(family: str, cases: list[BenchmarkCase]) -> None:
@@ -183,6 +241,17 @@ def validate_development(path: str | Path) -> dict:
     expected_strata = Counter({name: SCENARIOS_PER_STRATUM for name in STRATA})
     if strata != expected_strata:
         raise ValueError(f"unexpected E3 stratum distribution: {dict(strata)}")
+    expected_order = [
+        (f"v13_e3_dev_family_{index + 1:03d}", stratum)
+        for index in range(SCENARIOS_PER_STRATUM)
+        for stratum in STRATA
+    ]
+    actual_order = [
+        (str(case.metadata.get("scenario_family")), str(case.metadata.get("stratum")))
+        for case in cases
+    ]
+    if actual_order != expected_order:
+        raise ValueError("E3 cases must use scenario-major stratum-interleaved order")
 
     families: defaultdict[str, list[BenchmarkCase]] = defaultdict(list)
     for case in cases:
@@ -192,6 +261,34 @@ def validate_development(path: str | Path) -> dict:
         raise ValueError(f"expected {SCENARIOS_PER_STRATUM} matched scenario families")
     for family, family_cases in families.items():
         _validate_family(family, family_cases)
+
+    predicates = Counter(
+        str(cases[index].metadata["predicate"])
+        for index in range(0, len(cases), len(STRATA))
+    )
+    query_templates = Counter(
+        int(cases[index].metadata["query_template_index"])
+        for index in range(0, len(cases), len(STRATA))
+    )
+    target_positions = Counter(
+        str(cases[index].metadata["target_position_band"])
+        for index in range(0, len(cases), len(STRATA))
+    )
+    if set(predicates) != {item[0] for item in PREDICATE_SPECS}:
+        raise ValueError("E3 candidate does not cover every predicate family")
+    if set(query_templates) != set(range(len(QUERY_TEMPLATES))):
+        raise ValueError("E3 candidate does not cover every query template")
+    if set(target_positions) != {item[0] for item in TARGET_POSITION_SPECS}:
+        raise ValueError("E3 candidate does not cover every target-position band")
+    expected_predicates = SCENARIOS_PER_STRATUM // len(PREDICATE_SPECS)
+    expected_templates = SCENARIOS_PER_STRATUM // len(QUERY_TEMPLATES)
+    expected_positions = SCENARIOS_PER_STRATUM // len(TARGET_POSITION_SPECS)
+    if set(predicates.values()) != {expected_predicates}:
+        raise ValueError("E3 predicate families must be balanced")
+    if set(query_templates.values()) != {expected_templates}:
+        raise ValueError("E3 query templates must be balanced")
+    if set(target_positions.values()) != {expected_positions}:
+        raise ValueError("E3 target-position bands must be balanced")
 
     token_ranges = {}
     for stratum in STRATA:
@@ -219,10 +316,18 @@ def validate_development(path: str | Path) -> dict:
         "status": "pending_human_review",
         "scenario_families": len(families),
         "strata": dict(strata),
+        "predicate_distribution": dict(sorted(predicates.items())),
+        "query_template_distribution": {
+            str(key): value for key, value in sorted(query_templates.items())
+        },
+        "target_position_distribution": dict(sorted(target_positions.items())),
+        "distractor_kinds": list(DISTRACTOR_KINDS),
+        "case_order_policy": "scenario_major_stratum_interleaved",
         "token_ranges": token_ranges,
         "prefix_nested": True,
         "answer_leakage_free": True,
         "holdout_generated": False,
+        "case_ids": [case.case_id for case in cases],
         "sha256": sha256_file(target),
     }
 
