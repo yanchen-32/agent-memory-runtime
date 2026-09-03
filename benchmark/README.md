@@ -5,6 +5,9 @@
 - benchmark_v0.1.jsonl is the frozen 16-case baseline dataset.
 - benchmark_v0.2.jsonl contains the v0.1 cases plus 12 long-horizon cases.
 - v0.2 adds Temporal, Budget, Multi-hop and Forgetting categories.
+- `data/v1.3-e3/` is the 96-case, Development-only long-context scaling
+  candidate. It uses 24 matched scenarios at approximately 1K/4K/16K/32K
+  unconstrained B1 prompt tokens and remains pending human review.
 
 Each case contains a conversation, query, expected answer and expected memory IDs.
 The loader also supports frozen `answer_aliases`, `forbidden_memory_ids` and

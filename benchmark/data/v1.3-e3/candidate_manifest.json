@@ -1,0 +1,52 @@
+{
+  "benchmark_version": "1.3-e3-candidate",
+  "case_count": 96,
+  "case_order_policy": "scenario_major_stratum_interleaved",
+  "development_file": "development.jsonl",
+  "development_sha256": "a13736ab2b4ca62eb9c168f21614fcf2899a936b3343167bc83133383d792744",
+  "generator_version": "v1.3-e3.0",
+  "holdout_generated": false,
+  "observed_ranges": {
+    "long": {
+      "max_b1_prompt_tokens": 16043,
+      "max_history_memory_count": 358,
+      "min_b1_prompt_tokens": 16000,
+      "min_history_memory_count": 357,
+      "target_b1_prompt_tokens": 16000
+    },
+    "medium": {
+      "max_b1_prompt_tokens": 4028,
+      "max_history_memory_count": 89,
+      "min_b1_prompt_tokens": 4007,
+      "min_history_memory_count": 89,
+      "target_b1_prompt_tokens": 4000
+    },
+    "short": {
+      "max_b1_prompt_tokens": 1025,
+      "max_history_memory_count": 22,
+      "min_b1_prompt_tokens": 1015,
+      "min_history_memory_count": 22,
+      "target_b1_prompt_tokens": 1000
+    },
+    "very_long": {
+      "max_b1_prompt_tokens": 32043,
+      "max_history_memory_count": 717,
+      "min_b1_prompt_tokens": 32000,
+      "min_history_memory_count": 715,
+      "target_b1_prompt_tokens": 32000
+    }
+  },
+  "review_file": "review_checklist.csv",
+  "review_sha256": "8a6b665534202eba11111d8f710fb98c335494fc214a40cb8249d9ebc28d1f53",
+  "scenario_count": 24,
+  "seed": 20260903,
+  "split": "development",
+  "status": "pending_human_review",
+  "strata": {
+    "long": 16000,
+    "medium": 4000,
+    "short": 1000,
+    "very_long": 32000
+  },
+  "token_tolerance_ratio": 0.05
+}
