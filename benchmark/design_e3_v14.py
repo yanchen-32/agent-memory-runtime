@@ -9,16 +9,14 @@ import json
 from pathlib import Path
 
 from .artifacts import sha256_file
-from .generate_e3_v13 import (
-    DEFAULT_SEED,
+from .generate_e3_v13 import DEFAULT_SEED
+from .e3_v14_spec import (
+    DESIGN_VERSION,
     PREDICATE_SPECS,
-    QUERY_TEMPLATES,
+    QUERY_TEMPLATE_SPECS,
     STRATA,
     TARGET_POSITION_SPECS,
 )
-
-
-DESIGN_VERSION = "v1.4-e3-design.0"
 
 
 def build_orthogonal_design() -> list[dict]:
@@ -26,7 +24,7 @@ def build_orthogonal_design() -> list[dict]:
     for index, (predicate_index, query_template_index, target_position_index) in enumerate(
         itertools.product(
             range(len(PREDICATE_SPECS)),
-            range(len(QUERY_TEMPLATES)),
+            range(len(QUERY_TEMPLATE_SPECS)),
             range(len(TARGET_POSITION_SPECS)),
         ),
         start=1,
@@ -36,6 +34,7 @@ def build_orthogonal_design() -> list[dict]:
             "predicate_index": predicate_index,
             "predicate": PREDICATE_SPECS[predicate_index][0],
             "query_template_index": query_template_index,
+            "query_expression_mode": QUERY_TEMPLATE_SPECS[query_template_index]["mode"],
             "target_position_index": target_position_index,
             "target_position_band": TARGET_POSITION_SPECS[target_position_index][0],
             "scenario_seed": DEFAULT_SEED + (index - 1) * 10_007,
@@ -46,7 +45,7 @@ def build_orthogonal_design() -> list[dict]:
 def validate_orthogonal_design(rows: list[dict]) -> dict:
     expected = set(itertools.product(
         range(len(PREDICATE_SPECS)),
-        range(len(QUERY_TEMPLATES)),
+        range(len(QUERY_TEMPLATE_SPECS)),
         range(len(TARGET_POSITION_SPECS)),
     ))
     observed = [
@@ -67,15 +66,15 @@ def validate_orthogonal_design(rows: list[dict]) -> dict:
     predicate_template = Counter(item[:2] for item in observed)
     predicate_position = Counter((item[0], item[2]) for item in observed)
     template_position = Counter(item[1:] for item in observed)
-    if set(predicates.values()) != {len(QUERY_TEMPLATES) * len(TARGET_POSITION_SPECS)}:
+    if set(predicates.values()) != {len(QUERY_TEMPLATE_SPECS) * len(TARGET_POSITION_SPECS)}:
         raise ValueError("predicate marginal is not balanced")
     if set(templates.values()) != {len(PREDICATE_SPECS) * len(TARGET_POSITION_SPECS)}:
         raise ValueError("query-template marginal is not balanced")
-    if set(positions.values()) != {len(PREDICATE_SPECS) * len(QUERY_TEMPLATES)}:
+    if set(positions.values()) != {len(PREDICATE_SPECS) * len(QUERY_TEMPLATE_SPECS)}:
         raise ValueError("target-position marginal is not balanced")
     if set(predicate_template.values()) != {len(TARGET_POSITION_SPECS)}:
         raise ValueError("predicate/query pair is not balanced across positions")
-    if set(predicate_position.values()) != {len(QUERY_TEMPLATES)}:
+    if set(predicate_position.values()) != {len(QUERY_TEMPLATE_SPECS)}:
         raise ValueError("predicate/position pair is not balanced across templates")
     if set(template_position.values()) != {len(PREDICATE_SPECS)}:
         raise ValueError("query/position pair is not balanced across predicates")
@@ -87,7 +86,8 @@ def validate_orthogonal_design(rows: list[dict]) -> dict:
         "planned_development_cases": len(rows) * len(STRATA),
         "factor_levels": {
             "predicates": len(PREDICATE_SPECS),
-            "query_templates": len(QUERY_TEMPLATES),
+            "query_templates": len(QUERY_TEMPLATE_SPECS),
+            "query_expression_modes": sorted({spec["mode"] for spec in QUERY_TEMPLATE_SPECS}),
             "target_positions": len(TARGET_POSITION_SPECS),
         },
         "full_factorial": True,
@@ -113,8 +113,8 @@ def write_orthogonal_design(output_dir: str | Path) -> dict:
         "design_sha256": sha256_file(design_path),
         "source_benchmark": "v1.3-e3 Development diagnostics only",
         "pre_registration_note": (
-            "Generate semantic case content only after the v1.3 Development "
-            "ablation choice is locked."
+            "Semantic generation is authorized for the locked memory-runtime-v2 "
+            "method; Test remains ungenerated until Development gates pass."
         ),
     }
     (root / "design_manifest.json").write_text(

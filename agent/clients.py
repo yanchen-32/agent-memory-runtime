@@ -1,10 +1,60 @@
 from __future__ import annotations
 
 import json
+import http.client
 import os
 import re
+import threading
 import time
 from urllib import error, request
+from urllib.parse import urlsplit
+
+
+class _PersistentHTTPPool:
+    """Small process-wide keep-alive pool for sequential benchmark requests."""
+
+    def __init__(self) -> None:
+        self._connections: dict[tuple[str, str, int], http.client.HTTPConnection] = {}
+        self._lock = threading.Lock()
+
+    def _connection(self, scheme: str, host: str, port: int):
+        key = (scheme, host, port)
+        connection = self._connections.get(key)
+        if connection is None:
+            cls = http.client.HTTPSConnection if scheme == "https" else http.client.HTTPConnection
+            connection = cls(host, port=port)
+            self._connections[key] = connection
+        return key, connection
+
+    def request(
+        self,
+        url: str,
+        *,
+        body: bytes,
+        headers: dict[str, str],
+        timeout: int,
+    ) -> tuple[int, bytes]:
+        parsed = urlsplit(url)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise ValueError(f"unsupported LLM endpoint: {parsed.scheme or '<missing>'}")
+        port = parsed.port or (443 if parsed.scheme == "https" else 80)
+        path = parsed.path or "/"
+        if parsed.query:
+            path = f"{path}?{parsed.query}"
+        with self._lock:
+            key, connection = self._connection(parsed.scheme, parsed.hostname, port)
+            connection.timeout = timeout
+            try:
+                connection.request("POST", path, body=body, headers=headers)
+                response = connection.getresponse()
+                return response.status, response.read()
+            except Exception:
+                connection.close()
+                self._connections.pop(key, None)
+                raise
+
+
+_PERSISTENT_HTTP_POOL = _PersistentHTTPPool()
 
 
 class LLMRequestError(RuntimeError):
@@ -90,6 +140,7 @@ class OpenAICompatibleClient:
         thinking: str | None = "disabled",
         max_retries: int = 2,
         retry_backoff_seconds: float = 1.0,
+        persistent_connections: bool = False,
     ):
         self.model = model or os.getenv("LLM_MODEL", "")
         self.base_url = (base_url or os.getenv("LLM_BASE_URL", "http://localhost:8000/v1")).rstrip("/")
@@ -101,8 +152,11 @@ class OpenAICompatibleClient:
         self.thinking = thinking
         self.max_retries = max_retries
         self.retry_backoff_seconds = retry_backoff_seconds
+        self.persistent_connections = persistent_connections
         self.last_usage: dict = {}
         self.last_attempts = 0
+        self.last_prompt_cache_hit_tokens = 0
+        self.last_prompt_cache_miss_tokens = 0
         if not self.model:
             raise ValueError("LLM model is required. Pass model=... or set LLM_MODEL.")
         if thinking not in {None, "disabled", "enabled"}:
@@ -124,23 +178,49 @@ class OpenAICompatibleClient:
         if self.thinking is not None:
             body["thinking"] = {"type": self.thinking}
         payload = json.dumps(body).encode("utf-8")
+        url = f"{self.base_url}/chat/completions"
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+        }
         req = request.Request(
-            f"{self.base_url}/chat/completions",
+            url,
             data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}",
-            },
+            headers=headers,
             method="POST",
         )
         retryable_statuses = {408, 409, 429, 500, 502, 503, 504}
         self.last_usage = {}
+        self.last_prompt_cache_hit_tokens = 0
+        self.last_prompt_cache_miss_tokens = 0
         for attempt in range(1, self.max_retries + 2):
             self.last_attempts = attempt
             try:
-                with request.urlopen(req, timeout=self.timeout) as resp:
-                    data = json.loads(resp.read().decode("utf-8"))
+                if self.persistent_connections:
+                    status, response_body = _PERSISTENT_HTTP_POOL.request(
+                        url,
+                        body=payload,
+                        headers=headers,
+                        timeout=self.timeout,
+                    )
+                    if status < 200 or status >= 300:
+                        raise error.HTTPError(url, status, "LLM HTTP error", None, None)
+                    data = json.loads(response_body.decode("utf-8"))
+                else:
+                    with request.urlopen(req, timeout=self.timeout) as resp:
+                        data = json.loads(resp.read().decode("utf-8"))
                 self.last_usage = data.get("usage", {})
+                details = self.last_usage.get("prompt_tokens_details", {}) or {}
+                self.last_prompt_cache_hit_tokens = int(
+                    self.last_usage.get(
+                        "prompt_cache_hit_tokens",
+                        details.get("cached_tokens", 0),
+                    )
+                    or 0
+                )
+                self.last_prompt_cache_miss_tokens = int(
+                    self.last_usage.get("prompt_cache_miss_tokens", 0) or 0
+                )
                 return data["choices"][0]["message"]["content"].strip()
             except error.HTTPError as exc:
                 retryable = exc.code in retryable_statuses

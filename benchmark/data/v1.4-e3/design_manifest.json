@@ -1,9 +1,16 @@
 {
   "design_file": "orthogonal_design.jsonl",
-  "design_sha256": "d927f422699f7b9cbd104d07a81b411d6e7c00c50e42ac31797707d7d0094ee5",
-  "design_version": "v1.4-e3-design.0",
+  "design_sha256": "fd0c5b47b2a83ec247c3edef8db0284730fa11d6ca1c872f13a17746f1a034a2",
+  "design_version": "v1.4-e3-design.1",
   "factor_levels": {
     "predicates": 6,
+    "query_expression_modes": [
+      "canonical_literal",
+      "nonliteral",
+      "predicate_alias",
+      "temporal_alias",
+      "temporal_nonliteral"
+    ],
     "query_templates": 8,
     "target_positions": 3
   },
@@ -17,7 +24,7 @@
     "short": 1000,
     "very_long": 32000
   },
-  "pre_registration_note": "Generate semantic case content only after the v1.3 Development ablation choice is locked.",
+  "pre_registration_note": "Semantic generation is authorized for the locked memory-runtime-v2 method; Test remains ungenerated until Development gates pass.",
   "scenario_families": 144,
   "source_benchmark": "v1.3-e3 Development diagnostics only",
   "status": "design_only_pending_candidate_generation",

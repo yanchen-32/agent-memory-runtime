@@ -19,6 +19,7 @@ from memory.observability import TraceEvent, TraceRecorder
 from memory.context_budget import estimate_tokens
 from memory.service import MemoryReaderV1, MemoryWriterV1
 from memory.storage import InMemoryMemoryStore, MemoryStore
+from memory.structured_lookup import ExactFactRetriever, StructuredFactResolver
 
 
 class MemoryRuntimeV1:
@@ -31,6 +32,7 @@ class MemoryRuntimeV1:
         budget_manager: ContextBudgetManager | None = None,
         consolidation_policy: AdaptiveConsolidationPolicy | None = None,
         trace_enabled: bool = False,
+        structured_resolver: StructuredFactResolver | None = None,
     ):
         self.store = store or InMemoryMemoryStore()
         self.embedder = embedder or HashEmbeddingModel(dim=384)
@@ -38,6 +40,10 @@ class MemoryRuntimeV1:
         self.vector_retriever = VectorRetriever(self.store, self.embedder)
         self.bm25_retriever = BM25Retriever(self.store)
         self.hybrid_retriever = HybridRetriever(self.vector_retriever, self.bm25_retriever)
+        self.exact_fact_retriever = ExactFactRetriever(
+            self.store,
+            resolver=structured_resolver,
+        )
         self.reranker = WeightedReranker(self.store)
         self.compressor = MemoryCompressor()
         self.deduplicator = Deduplicator(self.embedder)

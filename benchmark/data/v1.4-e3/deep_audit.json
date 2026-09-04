@@ -1,0 +1,79 @@
+{
+  "answer_leakage_free": true,
+  "audit_version": "v1.4-e3-review.1",
+  "benchmark_version": "1.4-e3-candidate",
+  "case_count": 576,
+  "development_sha256": "04b99598ab17119234668caef0a8c89b6108693daa3202edb42c0f289ebba3ca",
+  "distributions": {
+    "predicate": {
+      "截止日期": 24,
+      "数据库": 24,
+      "架构": 24,
+      "答辩日期": 24,
+      "部署平台": 24,
+      "项目名称": 24
+    },
+    "query_expression_mode": {
+      "canonical_literal": 36,
+      "nonliteral": 36,
+      "predicate_alias": 36,
+      "temporal_alias": 18,
+      "temporal_nonliteral": 18
+    },
+    "query_template": {
+      "0": 18,
+      "1": 18,
+      "2": 18,
+      "3": 18,
+      "4": 18,
+      "5": 18,
+      "6": 18,
+      "7": 18
+    },
+    "target_position": {
+      "back": 48,
+      "front": 48,
+      "middle": 48
+    }
+  },
+  "failures": [],
+  "human_signatures_present": 0,
+  "review_sha256": "7b6d08b447c8e4163ba649b39bb8e8f9af1fbfb7d00d0f20ba082e83a884d3ab",
+  "scenario_family_count": 144,
+  "semantic_surfaces_valid": true,
+  "status": "passed_pending_human_review",
+  "strict_prefix_nested": true,
+  "technical_review_rows": 576,
+  "test_generated": false,
+  "token_ranges": {
+    "long": {
+      "max_b1_prompt_tokens": 16030,
+      "max_history_memory_count": 332,
+      "min_b1_prompt_tokens": 15971,
+      "min_history_memory_count": 325,
+      "target_b1_prompt_tokens": 16000
+    },
+    "medium": {
+      "max_b1_prompt_tokens": 4028,
+      "max_history_memory_count": 82,
+      "min_b1_prompt_tokens": 3971,
+      "min_history_memory_count": 79,
+      "target_b1_prompt_tokens": 4000
+    },
+    "short": {
+      "max_b1_prompt_tokens": 1030,
+      "max_history_memory_count": 19,
+      "min_b1_prompt_tokens": 970,
+      "min_history_memory_count": 18,
+      "target_b1_prompt_tokens": 1000
+    },
+    "very_long": {
+      "max_b1_prompt_tokens": 32031,
+      "max_history_memory_count": 666,
+      "min_b1_prompt_tokens": 31970,
+      "min_history_memory_count": 653,
+      "target_b1_prompt_tokens": 32000
+    }
+  },
+  "valid": true
+}

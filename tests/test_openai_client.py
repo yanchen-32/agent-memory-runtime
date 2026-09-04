@@ -94,3 +94,34 @@ def test_openai_client_does_not_retry_authentication_error(monkeypatch):
     assert calls == 1
     assert captured.value.status_code == 401
     assert captured.value.attempts == 1
+
+
+def test_openai_client_persistent_transport_and_cache_metrics(monkeypatch):
+    captured = []
+
+    def fake_request(url, *, body, headers, timeout):
+        captured.append((url, json.loads(body.decode()), headers, timeout))
+        return 200, json.dumps({
+            "choices": [{"message": {"content": "cached"}}],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 1,
+                "total_tokens": 11,
+                "prompt_cache_hit_tokens": 8,
+                "prompt_cache_miss_tokens": 2,
+            },
+        }).encode()
+
+    monkeypatch.setattr(clients_module._PERSISTENT_HTTP_POOL, "request", fake_request)
+    client = OpenAICompatibleClient(
+        model="model",
+        base_url="https://example.invalid/v1",
+        api_key="test-only",
+        timeout=17,
+        persistent_connections=True,
+    )
+    assert client.generate("test") == "cached"
+    assert captured[0][0] == "https://example.invalid/v1/chat/completions"
+    assert captured[0][3] == 17
+    assert client.last_prompt_cache_hit_tokens == 8
+    assert client.last_prompt_cache_miss_tokens == 2

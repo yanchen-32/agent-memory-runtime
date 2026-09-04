@@ -11,11 +11,12 @@ from agent import (
     HybridMemoryAgent,
     MemoryRuntimeAgent,
     NoMemoryAgent,
+    StructuredKeyValueAgent,
+    StructuredMemoryRuntimeAgent,
     VectorMemoryAgent,
 )
 from memory import (
     AdaptiveConsolidationPolicy,
-    HashEmbeddingModel,
     MemoryRuntimeV1,
     MemoryType,
     VectorMemoryStore,
@@ -25,7 +26,7 @@ from .loader import BenchmarkCase
 from .metrics import answer_metrics, estimate_tokens, retrieval_metrics
 
 
-AGENT_NAMES = ("B0", "B1", "B2", "B3", "Ours")
+AGENT_NAMES = ("B0", "B1", "B2", "B3", "StructuredKV", "Ours", "OursV2")
 RETRIEVAL_KEYS = (
     "recall@1", "precision@1",
     "recall@5", "precision@5",
@@ -106,6 +107,9 @@ def _invoke(
     token_budget: int | None,
     trace_id: str | None = None,
 ):
+    temporal_context = bool(
+        case.category == "temporal" or case.metadata.get("temporal_prompt")
+    )
     if agent_name == "B0":
         return agent.answer(case.query)
     if agent_name == "B1":
@@ -114,21 +118,21 @@ def _invoke(
             conversation=case.conversation,
             token_budget=token_budget,
             query_time=case.memory_query_time,
-            temporal_context=case.category == "temporal",
+            temporal_context=temporal_context,
         )
     if agent_name == "B2":
         return agent.answer(
             case.query,
             token_budget=token_budget,
             query_time=case.memory_query_time,
-            temporal_context=case.category == "temporal",
+            temporal_context=temporal_context,
         )
     if agent_name == "B3":
         return agent.answer(
             case.query,
             token_budget=token_budget,
             query_time=case.memory_query_time,
-            temporal_context=case.category == "temporal",
+            temporal_context=temporal_context,
         )
     return agent.answer(
         case.query,
@@ -136,12 +140,12 @@ def _invoke(
         query_time=case.memory_query_time,
         trace_id=trace_id,
         query_id=case.case_id,
-        temporal_context=case.category == "temporal",
+        temporal_context=temporal_context,
     )
 
 
 def _snapshot(agent_name: str, agent, case: BenchmarkCase) -> dict:
-    if agent_name == "Ours":
+    if agent_name in {"Ours", "OursV2"}:
         ranked_ids = _map_runtime_ids(agent, case)
     else:
         ranked_ids = list(getattr(agent, "last_retrieved_ids", []))
@@ -234,7 +238,11 @@ def run_case(
         )
         agent.ingest(case.conversation)
         retrieval_supported = True
-    else:
+    elif agent_name == "StructuredKV":
+        agent = StructuredKeyValueAgent()
+        agent.ingest(case.conversation, user_id="benchmark")
+        retrieval_supported = True
+    elif agent_name in {"Ours", "OursV2"}:
         runtime = MemoryRuntimeV1(
             embedder=embedder_factory(),
             consolidation_policy=consolidation_policy,
@@ -242,7 +250,8 @@ def run_case(
         )
         if trace_enabled:
             case_trace_id = runtime.trace_recorder.new_trace_id()
-        agent = MemoryRuntimeAgent(client, runtime, top_k=top_k)
+        agent_class = StructuredMemoryRuntimeAgent if agent_name == "OursV2" else MemoryRuntimeAgent
+        agent = agent_class(client, runtime, top_k=top_k)
         agent.ingest(
             case.conversation,
             user_id="benchmark",
@@ -359,9 +368,28 @@ def run_case(
         "api_prompt_tokens": after["api_usage"].get("prompt_tokens"),
         "api_completion_tokens": after["api_usage"].get("completion_tokens"),
         "api_total_tokens": after["api_usage"].get("total_tokens"),
+        "api_prompt_cache_hit_tokens": after["api_usage"].get(
+            "prompt_cache_hit_tokens",
+            (after["api_usage"].get("prompt_tokens_details") or {}).get("cached_tokens"),
+        ),
+        "api_prompt_cache_miss_tokens": after["api_usage"].get(
+            "prompt_cache_miss_tokens"
+        ),
         "api_attempts": after["api_attempts"],
+        "method_version": getattr(agent, "method_version", None),
+        "prompt_version": getattr(agent, "prompt_version", None),
+        "answer_route": getattr(agent, "last_answer_route", "llm"),
+        "retrieval_route": getattr(agent, "last_retrieval_route", None),
+        "fast_path_eligible": getattr(agent, "last_fast_path_eligible", False),
+        "fast_path_reason": getattr(agent, "last_fast_path_reason", None),
+        "fast_path_latency_ms": round(
+            float(getattr(agent, "last_fast_path_latency_ms", 0.0)), 4
+        ),
+        "llm_fallback_latency_ms": round(
+            float(getattr(agent, "last_llm_fallback_latency_ms", 0.0)), 4
+        ),
         "retrieval_supported": retrieval_supported,
-        "trace_enabled": trace_enabled if agent_name == "Ours" else False,
+        "trace_enabled": trace_enabled if agent_name in {"Ours", "OursV2"} else False,
         "retrieved_memory_ids": after["ranked_ids"],
         "expected_memory_ids": case.expected_memory_ids,
         "forbidden_memory_ids": case.forbidden_memory_ids,
@@ -424,7 +452,7 @@ def run_case(
         row.update(retrieval_metrics(after["ranked_ids"], case.expected_memory_ids))
     else:
         row.update(_empty_retrieval_metrics())
-    if agent_name == "Ours":
+    if agent_name in {"Ours", "OursV2"}:
         row["trace_id"] = agent.last_trace_id
         row["trace_events"] = (
             runtime.trace(trace_id=agent.last_trace_id)
@@ -566,7 +594,17 @@ def _failure_row(
         "api_prompt_tokens": None,
         "api_completion_tokens": None,
         "api_total_tokens": None,
+        "api_prompt_cache_hit_tokens": None,
+        "api_prompt_cache_miss_tokens": None,
         "api_attempts": getattr(exc, "attempts", None),
+        "method_version": None,
+        "prompt_version": None,
+        "answer_route": None,
+        "retrieval_route": None,
+        "fast_path_eligible": None,
+        "fast_path_reason": None,
+        "fast_path_latency_ms": None,
+        "llm_fallback_latency_ms": None,
         "retrieval_supported": retrieval_supported,
         "retrieved_memory_ids": [],
         "expected_memory_ids": case.expected_memory_ids,

@@ -1,0 +1,76 @@
+{
+  "benchmark_version": "1.4-e3-candidate",
+  "case_count": 576,
+  "case_order_policy": "scenario_major_stratum_interleaved",
+  "deep_audit": {
+    "file": "deep_audit.json",
+    "report_file": "deep_audit.md",
+    "report_sha256": "ecbedd9d59a696e8eebc134fc56293b9e8a68911d3c9922fb852fb47f31f95f1",
+    "sha256": "7236ded568db037eca19d4b037ed3433ca9edd0d60e5641f90eb3011dade2018",
+    "status": "passed_pending_human_review",
+    "valid": true,
+    "version": "v1.4-e3-review.1"
+  },
+  "design_sha256": "fd0c5b47b2a83ec247c3edef8db0284730fa11d6ca1c872f13a17746f1a034a2",
+  "design_version": "v1.4-e3-design.1",
+  "development_file": "development.jsonl",
+  "development_sha256": "04b99598ab17119234668caef0a8c89b6108693daa3202edb42c0f289ebba3ca",
+  "generator_version": "v1.4-e3.1",
+  "holdout_generated": false,
+  "observed_ranges": {
+    "long": {
+      "max_b1_prompt_tokens": 16030,
+      "max_history_memory_count": 332,
+      "min_b1_prompt_tokens": 15971,
+      "min_history_memory_count": 325,
+      "target_b1_prompt_tokens": 16000
+    },
+    "medium": {
+      "max_b1_prompt_tokens": 4028,
+      "max_history_memory_count": 82,
+      "min_b1_prompt_tokens": 3971,
+      "min_history_memory_count": 79,
+      "target_b1_prompt_tokens": 4000
+    },
+    "short": {
+      "max_b1_prompt_tokens": 1030,
+      "max_history_memory_count": 19,
+      "min_b1_prompt_tokens": 970,
+      "min_history_memory_count": 18,
+      "target_b1_prompt_tokens": 1000
+    },
+    "very_long": {
+      "max_b1_prompt_tokens": 32031,
+      "max_history_memory_count": 666,
+      "min_b1_prompt_tokens": 31970,
+      "min_history_memory_count": 653,
+      "target_b1_prompt_tokens": 32000
+    }
+  },
+  "review_file": "review_checklist.csv",
+  "review_sha256": "7b6d08b447c8e4163ba649b39bb8e8f9af1fbfb7d00d0f20ba082e83a884d3ab",
+  "review_signoff": {
+    "file": "review_signoff.json",
+    "scope": "all_v14_e3_development_candidates",
+    "unsigned_template_sha256": "01f830280b3f41105cf235b8e570af69e051a87b8480832c0b0bafb99fc76974"
+  },
+  "scenario_count": 144,
+  "seed": 20260903,
+  "split": "development",
+  "status": "pending_human_review",
+  "strata": {
+    "long": 16000,
+    "medium": 4000,
+    "short": 1000,
+    "very_long": 32000
+  },
+  "technical_prereview": {
+    "checked_cases": 576,
+    "file": "ai_prereview.md",
+    "sha256": "5fd4873762ac2d804b3a12ee7ee82baf0c998a25c6927734e2cae4b799460ad3",
+    "technical_failures": 0,
+    "version": "v1.4-e3-review.1"
+  },
+  "test_generated": false,
+  "token_tolerance_ratio": 0.05
+}

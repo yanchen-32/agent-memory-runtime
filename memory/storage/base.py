@@ -50,3 +50,43 @@ class MemoryStore(ABC):
                 if valid_to is None or point < valid_to:
                     records.append(record)
         return records
+
+    def list_fact_keys(
+        self,
+        user_id: str | None = None,
+        query_time: datetime | str | None = None,
+    ) -> list[tuple[str, str]]:
+        """List unique structured fact keys visible at ``query_time``.
+
+        Stores may override this with an index.  The default keeps the storage
+        interface backwards compatible for persistent adapters.
+        """
+        records = (
+            self.list_valid_at(query_time, user_id=user_id)
+            if query_time is not None
+            else self.list_active(user_id=user_id)
+        )
+        return sorted({
+            (record.subject, record.predicate)
+            for record in records
+            if record.subject and record.predicate
+        })
+
+    def list_by_fact_key(
+        self,
+        subject: str,
+        predicate: str,
+        user_id: str | None = None,
+        query_time: datetime | str | None = None,
+    ) -> list[MemoryRecord]:
+        """Read visible records for an exact ``subject + predicate`` key."""
+        records = (
+            self.list_valid_at(query_time, user_id=user_id)
+            if query_time is not None
+            else self.list_active(user_id=user_id)
+        )
+        return [
+            record
+            for record in records
+            if record.subject == subject and record.predicate == predicate
+        ]

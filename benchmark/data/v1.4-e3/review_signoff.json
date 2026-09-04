@@ -1,0 +1,12 @@
+{
+  "attestation": "I reviewed the bound v1.4-E3 Development package and its automated technical/deep audit, and approve this candidate for freezing.",
+  "benchmark_version": "1.4-e3-candidate",
+  "decision": "pending_human_review",
+  "deep_audit_sha256": "7236ded568db037eca19d4b037ed3433ca9edd0d60e5641f90eb3011dade2018",
+  "development_sha256": "04b99598ab17119234668caef0a8c89b6108693daa3202edb42c0f289ebba3ca",
+  "review_checklist_sha256": "7b6d08b447c8e4163ba649b39bb8e8f9af1fbfb7d00d0f20ba082e83a884d3ab",
+  "reviewed_case_count": 576,
+  "reviewed_scenario_family_count": 144,
+  "reviewer": "",
+  "scope": "all_v14_e3_development_candidates"
+}

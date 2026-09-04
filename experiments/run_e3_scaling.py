@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+# Direct execution adds the repository root before project imports.
+# ruff: noqa: E402
+
 import argparse
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -126,10 +129,12 @@ def build_e3_analysis(
     expected_case_ids: set[str] | None = None,
     expected_agents: set[str] | None = None,
     expected_repeats: int | None = None,
+    treatment_agent: str = "Ours",
 ) -> dict:
     """Build per-stratum statistics and the predeclared E3 admission gates."""
     if context_stability_tolerance < 0:
         raise ValueError("context stability tolerance must be non-negative")
+    comparison_label = f"B1_vs_{treatment_agent}"
     summaries = {}
     comparisons = {}
     stratum_failure_counts = {}
@@ -140,10 +145,14 @@ def build_e3_analysis(
         stratum_failure_counts[stratum] = failure_count
         f1 = paired_bootstrap_comparison(
             stratum_rows,
+            baseline="B1",
+            treatment=treatment_agent,
             metric="answer_f1",
             samples=bootstrap_samples,
         )
-        latency = paired_latency_reduction(stratum_rows)
+        latency = paired_latency_reduction(
+            stratum_rows, baseline="B1", treatment=treatment_agent
+        )
         for comparison in (f1, latency):
             comparison["formal_comparison_valid"] = (
                 failure_count == 0 and benchmark_review_enforced
@@ -153,11 +162,13 @@ def build_e3_analysis(
                 comparison["invalid_reason"] = "terminal run failures present"
             elif not benchmark_review_enforced:
                 comparison["invalid_reason"] = "unreviewed Development candidate"
-        comparisons[f"{stratum}_answer_f1_B1_vs_Ours"] = f1
-        comparisons[f"{stratum}_e2e_latency_B1_vs_Ours"] = latency
+        comparisons[f"{stratum}_answer_f1_{comparison_label}"] = f1
+        comparisons[f"{stratum}_e2e_latency_{comparison_label}"] = latency
 
     overall_f1 = paired_bootstrap_comparison(
         rows,
+        baseline="B1",
+        treatment=treatment_agent,
         metric="answer_f1",
         samples=bootstrap_samples,
     )
@@ -168,9 +179,9 @@ def build_e3_analysis(
         overall_f1["invalid_reason"] = "terminal run failures present"
     elif not benchmark_review_enforced:
         overall_f1["invalid_reason"] = "unreviewed Development candidate"
-    comparisons["overall_answer_f1_B1_vs_Ours"] = overall_f1
+    comparisons[f"overall_answer_f1_{comparison_label}"] = overall_f1
 
-    ours_context = _case_median_means(rows, "Ours", "context_tokens")
+    ours_context = _case_median_means(rows, treatment_agent, "context_tokens")
     defined_context = [value for value in ours_context.values() if value is not None]
     if len(defined_context) == len(STRATA) and min(defined_context) > 0:
         context_relative_spread = (max(defined_context) - min(defined_context)) / min(defined_context)
@@ -179,7 +190,7 @@ def build_e3_analysis(
         context_relative_spread = None
         context_stable = False
 
-    ours_rows = [row for row in rows if row.get("agent") == "Ours"]
+    ours_rows = [row for row in rows if row.get("agent") == treatment_agent]
     ours_failures = sum(row.get("status") == "failed" for row in ours_rows)
     forbidden_count = sum(
         int(row.get("forbidden_retrieved_count") or 0)
@@ -189,13 +200,13 @@ def build_e3_analysis(
     forbidden_zero = bool(ours_rows) and ours_failures == 0 and forbidden_count == 0
 
     f1_gate = all(
-        comparisons[f"{stratum}_answer_f1_B1_vs_Ours"].get(
+        comparisons[f"{stratum}_answer_f1_{comparison_label}"].get(
             "statistically_supported_non_decrease"
         ) is True
         and stratum_failure_counts[stratum] == 0
         for stratum in STRATA
     )
-    very_long_latency = comparisons["very_long_e2e_latency_B1_vs_Ours"]
+    very_long_latency = comparisons[f"very_long_e2e_latency_{comparison_label}"]
     very_long_latency_gate = (
         very_long_latency.get("target_met") is True
         and stratum_failure_counts["very_long"] == 0

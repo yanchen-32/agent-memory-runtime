@@ -30,6 +30,12 @@ from .lifecycle import CompressionResult, ForgettingPolicy, MemoryCompressor, St
 from .reranker import WeightedReranker
 from .retrieval import BM25Retriever, HybridRetriever, VectorRetriever
 from .runtime import MemoryRuntimeV1
+from .structured_lookup import (
+    DEFAULT_PREDICATE_ALIASES,
+    ExactFactRetriever,
+    ResolvedFactKey,
+    StructuredFactResolver,
+)
 from .observability import TraceEvent, TraceRecorder
 from .schema import (
     ConflictType,
@@ -58,6 +64,7 @@ __all__ = [
     "ConflictDetector", "ConflictResult", "DedupDecision", "DedupResult", "Deduplicator", "VersionedMemoryUpdater",
     "CompressionResult", "ForgettingPolicy", "MemoryCompressor", "StrengthBreakdown",
     "WeightedReranker", "BM25Retriever", "HybridRetriever", "VectorRetriever", "MemoryRuntimeV1",
+    "DEFAULT_PREDICATE_ALIASES", "ExactFactRetriever", "ResolvedFactKey", "StructuredFactResolver",
     "TraceEvent", "TraceRecorder",
     "ConflictType", "MemoryAction", "MemoryCandidate", "MemoryRecord", "MemoryStatus", "MemoryType",
     "ReadResult", "SearchResult", "WriteResult", "coerce_datetime",
